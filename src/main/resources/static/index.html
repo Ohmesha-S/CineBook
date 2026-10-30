@@ -1,0 +1,203 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CineBook - Premium Movie Ticket Booking Experience</title>
+  <meta name="description" content="Book tickets for the latest movies in IMAX, 4DX, and Dolby Atmos. Live seat layouts, instant confirmation, and seamless booking.">
+  
+  <!-- Fonts & Icons -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  
+  <!-- Application Stylesheets -->
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="stylesheet" href="/css/movies.css">
+</head>
+<body>
+
+  <!-- Navigation Bar -->
+  <header class="navbar">
+    <div class="container navbar-inner">
+      <a href="/index.html" class="nav-brand">
+        <div class="brand-icon"><i class="fas fa-film"></i></div>
+        <span>Cine<span class="highlight">Book</span></span>
+      </a>
+
+      <ul class="nav-links" id="navLinks">
+        <li><a href="/index.html" class="nav-link active"><i class="fas fa-home"></i> Home</a></li>
+        <li><a href="/movies.html" class="nav-link"><i class="fas fa-play"></i> Movies</a></li>
+        <li><a href="/my-bookings.html" class="nav-link"><i class="fas fa-ticket-alt"></i> My Bookings</a></li>
+      </ul>
+
+      <div class="nav-actions" id="navActions">
+        <!-- Injected dynamically by api.js based on auth state -->
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content Container -->
+  <main class="container">
+
+    <!-- Hero Featured Premiere Banner -->
+    <section class="hero-banner" id="heroBanner">
+      <div class="hero-overlay"></div>
+      <div class="hero-content">
+        <span class="badge badge-primary"><i class="fas fa-spinner fa-spin"></i> Loading Featured Movie...</span>
+        <h1 class="hero-title" style="margin-top: 1rem;">Experience Cinema Like Never Before</h1>
+        <p class="hero-desc">Discover the biggest blockbusters, book your preferred luxury seats in real time, and enjoy an immersive theatre experience.</p>
+        <div class="hero-actions">
+          <a href="/movies.html" class="btn btn-primary btn-lg"><i class="fas fa-film"></i> Explore Movies</a>
+        </div>
+      </div>
+    </section>
+
+    <!-- Quick Search & Genre Filter Bar -->
+    <section class="filter-bar">
+      <div class="filter-top">
+        <div class="search-box">
+          <i class="fas fa-search"></i>
+          <input type="text" id="movieSearchInput" placeholder="Search by title, genre, director, or language...">
+        </div>
+        <div style="font-size: 0.88rem; color: var(--text-muted);">
+          <i class="fas fa-bolt text-gradient"></i> Instant Live Search
+        </div>
+      </div>
+      <div class="filter-pills" id="genrePills">
+        <button class="pill-btn active" onclick="filterByGenre('ALL', this)">All Genres</button>
+      </div>
+    </section>
+
+    <!-- Now Showing Section -->
+    <section style="margin-bottom: 3.5rem;">
+      <div class="section-header">
+        <div>
+          <h2><i class="fas fa-play-circle text-gradient"></i> Now Showing in Theatres</h2>
+          <p style="color: var(--text-muted); font-size: 0.9rem; margin-top: 0.2rem;">Select a movie to pick your cinema hall and reserve seats</p>
+        </div>
+        <a href="/movies.html">See All <i class="fas fa-arrow-right"></i></a>
+      </div>
+
+      <div class="movies-grid" id="nowShowingGrid">
+        <!-- Dynamically rendered by home.js -->
+      </div>
+    </section>
+
+    <!-- Why CineBook Feature Section -->
+    <section style="background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); padding: 3rem 2rem; margin-bottom: 3.5rem;">
+      <div style="text-align: center; max-width: 600px; margin: 0 auto 2.5rem;">
+        <span class="badge badge-cyan"><i class="fas fa-star"></i> Cutting-Edge Platform</span>
+        <h2 style="font-size: 2rem; margin-top: 0.5rem;">Why Book With CineBook?</h2>
+        <p style="color: var(--text-secondary); margin-top: 0.5rem;">Engineered for high performance, dynamic concurrency protection, and an unforgettable movie night.</p>
+      </div>
+
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 2rem;">
+        <div style="background: var(--bg-elevated); padding: 1.75rem; border-radius: var(--radius-md); border: 1px solid var(--border-subtle); text-align: center;">
+          <div style="width: 50px; height: 50px; border-radius: 50%; background: rgba(229, 9, 20, 0.15); color: #ff4b59; display: flex; align-items: center; justify-content: center; font-size: 1.4rem; margin: 0 auto 1.25rem;">
+            <i class="fas fa-chair"></i>
+          </div>
+          <h3 style="font-size: 1.15rem; margin-bottom: 0.5rem;">Live Seat Map</h3>
+          <p style="color: var(--text-muted); font-size: 0.88rem;">Interactive seat selection with real-time locking prevents double booking instantly.</p>
+        </div>
+
+        <div style="background: var(--bg-elevated); padding: 1.75rem; border-radius: var(--radius-md); border: 1px solid var(--border-subtle); text-align: center;">
+          <div style="width: 50px; height: 50px; border-radius: 50%; background: rgba(0, 229, 255, 0.15); color: #00e5ff; display: flex; align-items: center; justify-content: center; font-size: 1.4rem; margin: 0 auto 1.25rem;">
+            <i class="fas fa-credit-card"></i>
+          </div>
+          <h3 style="font-size: 1.15rem; margin-bottom: 0.5rem;">Simulated Checkout</h3>
+          <p style="color: var(--text-muted); font-size: 0.88rem;">Multi-channel payment simulation supporting Card, UPI, and Net Banking tests.</p>
+        </div>
+
+        <div style="background: var(--bg-elevated); padding: 1.75rem; border-radius: var(--radius-md); border: 1px solid var(--border-subtle); text-align: center;">
+          <div style="width: 50px; height: 50px; border-radius: 50%; background: rgba(245, 158, 11, 0.15); color: #fbbf24; display: flex; align-items: center; justify-content: center; font-size: 1.4rem; margin: 0 auto 1.25rem;">
+            <i class="fas fa-qrcode"></i>
+          </div>
+          <h3 style="font-size: 1.15rem; margin-bottom: 0.5rem;">Digital E-Tickets</h3>
+          <p style="color: var(--text-muted); font-size: 0.88rem;">Instant boarding pass generation with unique verification codes and print support.</p>
+        </div>
+
+        <div style="background: var(--bg-elevated); padding: 1.75rem; border-radius: var(--radius-md); border: 1px solid var(--border-subtle); text-align: center;">
+          <div style="width: 50px; height: 50px; border-radius: 50%; background: rgba(16, 185, 129, 0.15); color: #34d399; display: flex; align-items: center; justify-content: center; font-size: 1.4rem; margin: 0 auto 1.25rem;">
+            <i class="fas fa-shield-alt"></i>
+          </div>
+          <h3 style="font-size: 1.15rem; margin-bottom: 0.5rem;">Reliable Security</h3>
+          <p style="color: var(--text-muted); font-size: 0.88rem;">Spring Security 6 with stateless JWT authentication and role-based access control.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Upcoming Movies Section -->
+    <section style="margin-bottom: 4rem;">
+      <div class="section-header">
+        <div>
+          <h2><i class="fas fa-calendar-alt text-gradient"></i> Coming Soon to CineBook</h2>
+          <p style="color: var(--text-muted); font-size: 0.9rem; margin-top: 0.2rem;">Preview upcoming cinematic releases arriving shortly</p>
+        </div>
+        <a href="/movies.html">Full Catalog <i class="fas fa-arrow-right"></i></a>
+      </div>
+
+      <div class="movies-grid" id="upcomingGrid">
+        <!-- Dynamically rendered by home.js -->
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Global Footer -->
+  <footer class="footer">
+    <div class="container">
+      <div class="footer-grid">
+        <div class="footer-brand">
+          <div class="nav-brand">
+            <div class="brand-icon"><i class="fas fa-film"></i></div>
+            <span>Cine<span class="highlight">Book</span></span>
+          </div>
+          <p>A full-stack Java Spring Boot and MySQL academic software engineering project demonstrating 3-tier architecture, OOP, and concurrent booking control.</p>
+        </div>
+
+        <div class="footer-col">
+          <h4>Explore</h4>
+          <ul class="footer-links">
+            <li><a href="/index.html">Home</a></li>
+            <li><a href="/movies.html">All Movies</a></li>
+            <li><a href="/my-bookings.html">My Bookings</a></li>
+            <li><a href="/login.html">Sign In</a></li>
+          </ul>
+        </div>
+
+        <div class="footer-col">
+          <h4>Admin Portal</h4>
+          <ul class="footer-links">
+            <li><a href="/admin.html">Admin Dashboard</a></li>
+            <li><a href="/login.html">Admin Login</a></li>
+            <li><a href="javascript:void(0)" onclick="fillAdminCredentials()">Demo Credentials</a></li>
+          </ul>
+        </div>
+
+        <div class="footer-col">
+          <h4>Technologies</h4>
+          <ul class="footer-links">
+            <li><a href="#">Java 21 / Spring Boot 3</a></li>
+            <li><a href="#">MySQL 8 Relational DB</a></li>
+            <li><a href="#">Spring Security & JWT</a></li>
+            <li><a href="#">RESTful Architecture</a></li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="footer-bottom">
+        <div>&copy; 2026 CineBook System. Built for Java Programming Lab Evaluation.</div>
+        <div style="display: flex; gap: 1rem;">
+          <span>Academic Project Demonstration</span>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Scripts -->
+  <script src="/js/api.js"></script>
+  <script src="/js/home.js"></script>
+</body>
+</html>

@@ -1,0 +1,102 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Digital Ticket - CineBook</title>
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="stylesheet" href="/css/booking.css">
+
+  <style>
+    @media print {
+      body {
+        background: #fff !important;
+        color: #000 !important;
+      }
+      .navbar, .footer, button, a.btn {
+        display: none !important;
+      }
+      .ticket-wrapper {
+        margin: 0 !important;
+        max-width: 100% !important;
+      }
+      .ticket-card {
+        border: 2px solid #000 !important;
+        box-shadow: none !important;
+        background: #fff !important;
+        color: #000 !important;
+      }
+      .ticket-header {
+        background: #000 !important;
+        color: #fff !important;
+      }
+      .ticket-footer {
+        background: #f1f5f9 !important;
+        border-top: 2px dashed #000 !important;
+      }
+      .barcode-lines {
+        filter: invert(1);
+      }
+      .seat-tag {
+        border: 1px solid #000 !important;
+        color: #000 !important;
+        background: #eee !important;
+      }
+      .details-synopsis, h2, strong, span {
+        color: #000 !important;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Navigation Bar -->
+  <header class="navbar">
+    <div class="container navbar-inner">
+      <a href="/index.html" class="nav-brand">
+        <div class="brand-icon"><i class="fas fa-film"></i></div>
+        <span>Cine<span class="highlight">Book</span></span>
+      </a>
+
+      <ul class="nav-links" id="navLinks">
+        <li><a href="/index.html" class="nav-link"><i class="fas fa-home"></i> Home</a></li>
+        <li><a href="/movies.html" class="nav-link"><i class="fas fa-play"></i> Movies</a></li>
+        <li><a href="/my-bookings.html" class="nav-link"><i class="fas fa-ticket-alt"></i> My Bookings</a></li>
+      </ul>
+
+      <div class="nav-actions" id="navActions"></div>
+    </div>
+  </header>
+
+  <main class="container" style="padding-top: 2rem;">
+
+    <div class="ticket-wrapper">
+      <div id="ticketDetailsContainer">
+        <div class="empty-state">
+          <i class="fas fa-spinner fa-spin icon"></i>
+          <p>Generating verified digital boarding pass...</p>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <footer class="footer">
+    <div class="container">
+      <div class="footer-bottom">
+        <div>&copy; 2026 CineBook System. Built for Java Programming Lab Evaluation.</div>
+        <div><a href="/my-bookings.html" style="color: var(--accent-primary);">← Back to My Bookings</a></div>
+      </div>
+    </div>
+  </footer>
+
+  <script src="/js/api.js"></script>
+  <script src="/js/ticket.js"></script>
+</body>
+</html>

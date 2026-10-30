@@ -1,0 +1,91 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Movie Details - CineBook</title>
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="stylesheet" href="/css/movies.css">
+  <link rel="stylesheet" href="/css/booking.css">
+</head>
+<body>
+
+  <!-- Navigation Bar -->
+  <header class="navbar">
+    <div class="container navbar-inner">
+      <a href="/index.html" class="nav-brand">
+        <div class="brand-icon"><i class="fas fa-film"></i></div>
+        <span>Cine<span class="highlight">Book</span></span>
+      </a>
+
+      <ul class="nav-links" id="navLinks">
+        <li><a href="/index.html" class="nav-link"><i class="fas fa-home"></i> Home</a></li>
+        <li><a href="/movies.html" class="nav-link active"><i class="fas fa-play"></i> Movies</a></li>
+        <li><a href="/my-bookings.html" class="nav-link"><i class="fas fa-ticket-alt"></i> My Bookings</a></li>
+      </ul>
+
+      <div class="nav-actions" id="navActions"></div>
+    </div>
+  </header>
+
+  <main class="container" style="padding-top: 1.5rem;">
+
+    <!-- Movie Details Hero Banner -->
+    <section class="details-hero" id="detailsHero">
+      <div class="details-hero-overlay"></div>
+      <div class="details-hero-content" id="detailsMetaContainer">
+        <!-- Rendered by movie-details.js -->
+        <div class="empty-state" style="color: #fff; width: 100%;">
+          <i class="fas fa-spinner fa-spin icon"></i>
+          <p>Loading movie information from MySQL...</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Showtimes & Cinema Theatres Section -->
+    <section style="margin-bottom: 4rem;">
+      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem;">
+        <div>
+          <h2><i class="fas fa-calendar-check text-gradient"></i> Select Date & Theatre Showtime</h2>
+          <p style="color: var(--text-muted); font-size: 0.9rem; margin-top: 0.2rem;">Choose your preferred cinema hall, screen type, and show timing</p>
+        </div>
+        <a id="directBookBtn" href="#" class="btn btn-primary" style="display: none;">
+          <i class="fas fa-ticket-alt"></i> Book Tickets
+        </a>
+      </div>
+
+      <!-- Date Ribbon Selector -->
+      <div class="date-selector">
+        <div class="date-ribbon" id="dateRibbon">
+          <!-- Injected by movie-details.js -->
+        </div>
+      </div>
+
+      <!-- Theatres and Showtimes List -->
+      <div id="theatresListContainer">
+        <!-- Injected by movie-details.js -->
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Global Footer -->
+  <footer class="footer">
+    <div class="container">
+      <div class="footer-bottom">
+        <div>&copy; 2026 CineBook System. Built for Java Programming Lab Evaluation.</div>
+        <div><a href="/movies.html" style="color: var(--accent-primary);">← Back to Movies</a></div>
+      </div>
+    </div>
+  </footer>
+
+  <script src="/js/api.js"></script>
+  <script src="/js/movie-details.js"></script>
+</body>
+</html>

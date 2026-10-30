@@ -1,0 +1,3 @@
+@echo off
+echo Starting CineLuxe Java Console Client (TCP Socket)...
+java -cp target/classes;"%USERPROFILE%\.m2\repository\org\springframework\boot\spring-boot\3.3.5\spring-boot-3.3.5.jar" com.movieticket.client.CinemaClient %*
