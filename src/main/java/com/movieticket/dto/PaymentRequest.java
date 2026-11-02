@@ -1,24 +1,17 @@
 package com.movieticket.dto;
 
 import com.movieticket.enums.PaymentMethod;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 
 public class PaymentRequest {
 
-    @NotBlank(message = "Booking reference is required")
     private String bookingReference;
-
-    @NotNull(message = "Payment method is required")
-    private PaymentMethod paymentMethod = PaymentMethod.CARD;
-
-    // Simulation parameter: "SUCCESS" or "FAIL" (default: "SUCCESS")
+    private String paymentMethod = PaymentMethod.CARD;
     private String simulateOutcome = "SUCCESS";
 
     public PaymentRequest() {
     }
 
-    public PaymentRequest(String bookingReference, PaymentMethod paymentMethod, String simulateOutcome) {
+    public PaymentRequest(String bookingReference, String paymentMethod, String simulateOutcome) {
         this.bookingReference = bookingReference;
         this.paymentMethod = paymentMethod;
         this.simulateOutcome = simulateOutcome != null ? simulateOutcome : "SUCCESS";
@@ -32,11 +25,11 @@ public class PaymentRequest {
         this.bookingReference = bookingReference;
     }
 
-    public PaymentMethod getPaymentMethod() {
+    public String getPaymentMethod() {
         return paymentMethod;
     }
 
-    public void setPaymentMethod(PaymentMethod paymentMethod) {
+    public void setPaymentMethod(String paymentMethod) {
         this.paymentMethod = paymentMethod;
     }
 

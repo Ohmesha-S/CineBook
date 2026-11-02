@@ -1,11 +1,16 @@
 package com.movieticket.network;
 
-import com.movieticket.os.OsSystemInspector;
-import com.movieticket.os.OsTicketPrinter;
-import com.movieticket.service.*;
-import jakarta.annotation.PreDestroy;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import com.movieticket.os.BookingMetricsCounter;
+import com.movieticket.os.TicketNotificationService;
+import com.movieticket.service.AuthService;
+import com.movieticket.service.BookingService;
+import com.movieticket.service.DashboardService;
+import com.movieticket.service.MovieService;
+import com.movieticket.service.PaymentService;
+import com.movieticket.service.SeatService;
+import com.movieticket.service.ShowService;
+import com.movieticket.service.TheatreService;
+import com.movieticket.service.TicketService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.stereotype.Component;
@@ -13,24 +18,22 @@ import org.springframework.stereotype.Component;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
 
 /**
- * Concept 5: Networking using Java & Concept 6: Java OS Concurrency
- * Multi-threaded TCP Socket Server managed by Spring Boot.
+ * Unit 5 (Networking using Java) & Unit 6 (Java for Operating System - Multithreading):
+ * Multi-threaded TCP Socket Server using java.net.ServerSocket, Socket, Runnable, and Thread.
  */
 @Component
-public class CinemaSocketServer implements CommandLineRunner {
-
-    private static final Logger logger = LoggerFactory.getLogger(CinemaSocketServer.class);
+public class CinemaSocketServer implements CommandLineRunner, Runnable {
 
     @Value("${cinema.socket.server.port:8888}")
     private int port;
 
     @Value("${cinema.socket.server.enabled:true}")
     private boolean enabled;
+
+    @Value("${server.port:8080}")
+    private int httpPort;
 
     private final AuthService authService;
     private final MovieService movieService;
@@ -41,12 +44,12 @@ public class CinemaSocketServer implements CommandLineRunner {
     private final PaymentService paymentService;
     private final TicketService ticketService;
     private final DashboardService dashboardService;
-    private final OsTicketPrinter osTicketPrinter;
-    private final OsSystemInspector osSystemInspector;
+    private final BookingMetricsCounter metricsCounter;
+    private final TicketNotificationService notificationService;
 
     private ServerSocket serverSocket;
-    private ExecutorService threadPool;
     private volatile boolean running = false;
+    private int workerSequence = 0;
 
     public CinemaSocketServer(AuthService authService,
                               MovieService movieService,
@@ -57,8 +60,8 @@ public class CinemaSocketServer implements CommandLineRunner {
                               PaymentService paymentService,
                               TicketService ticketService,
                               DashboardService dashboardService,
-                              OsTicketPrinter osTicketPrinter,
-                              OsSystemInspector osSystemInspector) {
+                              BookingMetricsCounter metricsCounter,
+                              TicketNotificationService notificationService) {
         this.authService = authService;
         this.movieService = movieService;
         this.theatreService = theatreService;
@@ -68,42 +71,39 @@ public class CinemaSocketServer implements CommandLineRunner {
         this.paymentService = paymentService;
         this.ticketService = ticketService;
         this.dashboardService = dashboardService;
-        this.osTicketPrinter = osTicketPrinter;
-        this.osSystemInspector = osSystemInspector;
+        this.metricsCounter = metricsCounter;
+        this.notificationService = notificationService;
     }
 
     @Override
     public void run(String... args) {
         if (!enabled) {
-            logger.info("Cinema TCP Socket Server is disabled by configuration.");
+            System.out.println("[SOCKET] Cinema TCP Socket Server is disabled by configuration.");
             return;
         }
 
-        this.threadPool = Executors.newCachedThreadPool();
         this.running = true;
-
-        // Register OS shutdown hook (Concept 6: Java for OS)
-        Runtime.getRuntime().addShutdownHook(new Thread(this::stopServer, "os-shutdown-hook"));
-
-        // Launch TCP ServerSocket in a dedicated background thread
-        Thread serverThread = new Thread(this::startServerLoop, "cinema-socket-listener");
-        serverThread.setDaemon(false);
-        serverThread.start();
+        Thread listenerThread = new Thread(this, "CinemaSocketListener");
+        listenerThread.setDaemon(true);
+        listenerThread.start();
     }
 
-    private void startServerLoop() {
+    @Override
+    public void run() {
         try {
             this.serverSocket = new ServerSocket(port);
-            logger.info("====================================================================");
-            logger.info(">>> Concept 5: Java TCP Socket Server listening on port: {}", port);
-            logger.info(">>> Connect with CinemaClient or: telnet localhost {}", port);
-            logger.info("====================================================================");
+            System.out.println("====================================================================");
+            System.out.println(">>> Unit 5: Java TCP ServerSocket listening on port: " + port);
+            System.out.println(">>> Connect with CinemaClient or: telnet localhost " + port);
+            System.out.println("====================================================================");
 
             while (running && !serverSocket.isClosed()) {
                 try {
                     Socket clientSocket = serverSocket.accept();
+                    int clientId = nextWorkerId();
                     ClientHandler handler = new ClientHandler(
                             clientSocket,
+                            httpPort,
                             authService,
                             movieService,
                             theatreService,
@@ -113,44 +113,36 @@ public class CinemaSocketServer implements CommandLineRunner {
                             paymentService,
                             ticketService,
                             dashboardService,
-                            osTicketPrinter,
-                            osSystemInspector
+                            metricsCounter,
+                            notificationService
                     );
-                    threadPool.submit(handler);
+                    Thread clientThread = new Thread(handler, "CinemaClientWorker-" + clientId);
+                    clientThread.setDaemon(true);
+                    clientThread.start();
                 } catch (IOException e) {
                     if (running) {
-                        logger.error("Error accepting incoming client socket: {}", e.getMessage());
+                        System.err.println("[SOCKET] Error accepting client socket: " + e.getMessage());
                     }
                 }
             }
         } catch (IOException e) {
-            logger.error("Could not bind ServerSocket on port {}: {}", port, e.getMessage());
+            System.err.println("[SOCKET] Could not bind ServerSocket on port " + port + ": " + e.getMessage());
         }
     }
 
-    @PreDestroy
+    private synchronized int nextWorkerId() {
+        workerSequence = workerSequence + 1;
+        return workerSequence;
+    }
+
     public void stopServer() {
         this.running = false;
-        logger.info("Shutting down Cinema TCP Socket Server and thread pool...");
         if (serverSocket != null && !serverSocket.isClosed()) {
             try {
                 serverSocket.close();
             } catch (IOException e) {
-                logger.error("Error closing server socket: {}", e.getMessage());
+                System.err.println("[SOCKET] Error closing ServerSocket: " + e.getMessage());
             }
         }
-
-        if (threadPool != null && !threadPool.isShutdown()) {
-            threadPool.shutdown();
-            try {
-                if (!threadPool.awaitTermination(3, TimeUnit.SECONDS)) {
-                    threadPool.shutdownNow();
-                }
-            } catch (InterruptedException e) {
-                threadPool.shutdownNow();
-                Thread.currentThread().interrupt();
-            }
-        }
-        logger.info("Cinema TCP Socket Server stopped successfully.");
     }
 }

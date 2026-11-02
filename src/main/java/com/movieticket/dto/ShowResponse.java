@@ -1,7 +1,7 @@
 package com.movieticket.dto;
 
-import com.movieticket.enums.ShowStatus;
 import com.movieticket.model.Show;
+
 import java.time.LocalDate;
 import java.time.LocalTime;
 
@@ -20,14 +20,16 @@ public class ShowResponse {
     private LocalDate showDate;
     private LocalTime startTime;
     private LocalTime endTime;
-    private ShowStatus status;
+    private String status;
     private Double priceMultiplier;
 
     public ShowResponse() {
     }
 
     public static ShowResponse fromEntity(Show show) {
-        if (show == null) return null;
+        if (show == null) {
+            return null;
+        }
         ShowResponse dto = new ShowResponse();
         dto.setId(show.getId());
         if (show.getMovie() != null) {
@@ -166,11 +168,11 @@ public class ShowResponse {
         this.endTime = endTime;
     }
 
-    public ShowStatus getStatus() {
+    public String getStatus() {
         return status;
     }
 
-    public void setStatus(ShowStatus status) {
+    public void setStatus(String status) {
         this.status = status;
     }
 

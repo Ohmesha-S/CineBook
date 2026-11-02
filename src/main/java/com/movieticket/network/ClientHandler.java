@@ -1,30 +1,55 @@
 package com.movieticket.network;
 
-import com.movieticket.dto.*;
-import com.movieticket.enums.*;
+import com.movieticket.dto.AuthResponse;
+import com.movieticket.dto.BookingRequest;
+import com.movieticket.dto.BookingResponse;
+import com.movieticket.dto.DashboardStatsDto;
+import com.movieticket.dto.LoginRequest;
+import com.movieticket.dto.MovieRequest;
+import com.movieticket.dto.MovieResponse;
+import com.movieticket.dto.PaymentRequest;
+import com.movieticket.dto.RegisterRequest;
+import com.movieticket.dto.SeatDto;
+import com.movieticket.dto.SeatLayoutResponse;
+import com.movieticket.dto.ShowResponse;
+import com.movieticket.dto.TicketResponse;
+import com.movieticket.enums.MovieStatus;
+import com.movieticket.enums.PaymentMethod;
+import com.movieticket.enums.UserRole;
 import com.movieticket.model.User;
-import com.movieticket.os.OsSystemInspector;
-import com.movieticket.os.OsTicketPrinter;
-import com.movieticket.service.*;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import com.movieticket.os.BookingMetricsCounter;
+import com.movieticket.os.TicketNotificationService;
+import com.movieticket.service.AuthService;
+import com.movieticket.service.BookingService;
+import com.movieticket.service.DashboardService;
+import com.movieticket.service.MovieService;
+import com.movieticket.service.PaymentService;
+import com.movieticket.service.SeatService;
+import com.movieticket.service.ShowService;
+import com.movieticket.service.TheatreService;
+import com.movieticket.service.TicketService;
 
-import java.io.*;
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.OutputStreamWriter;
+import java.io.PrintWriter;
+import java.net.InetAddress;
 import java.net.Socket;
-import java.nio.file.Path;
-import java.util.Arrays;
+import java.net.URL;
+import java.net.URLConnection;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
+import java.util.Map;
 
 /**
- * Concept 5: Networking using Java & Concept 6: Java OS Concurrency
- * Handles an individual client connection over a TCP Socket using I/O Streams and Multi-threading.
+ * Unit 5 (Networking using Java - Socket, InetAddress, URL, URLConnection, BufferedReader, PrintWriter)
+ * & Unit 6 (Java for OS - Runnable worker thread per connected client).
  */
 public class ClientHandler implements Runnable {
 
-    private static final Logger logger = LoggerFactory.getLogger(ClientHandler.class);
-
     private final Socket clientSocket;
+    private final int httpPort;
     private final AuthService authService;
     private final MovieService movieService;
     private final TheatreService theatreService;
@@ -34,12 +59,13 @@ public class ClientHandler implements Runnable {
     private final PaymentService paymentService;
     private final TicketService ticketService;
     private final DashboardService dashboardService;
-    private final OsTicketPrinter osTicketPrinter;
-    private final OsSystemInspector osSystemInspector;
+    private final BookingMetricsCounter metricsCounter;
+    private final TicketNotificationService notificationService;
 
     private User authenticatedUser;
 
     public ClientHandler(Socket clientSocket,
+                         int httpPort,
                          AuthService authService,
                          MovieService movieService,
                          TheatreService theatreService,
@@ -49,9 +75,10 @@ public class ClientHandler implements Runnable {
                          PaymentService paymentService,
                          TicketService ticketService,
                          DashboardService dashboardService,
-                         OsTicketPrinter osTicketPrinter,
-                         OsSystemInspector osSystemInspector) {
+                         BookingMetricsCounter metricsCounter,
+                         TicketNotificationService notificationService) {
         this.clientSocket = clientSocket;
+        this.httpPort = httpPort;
         this.authService = authService;
         this.movieService = movieService;
         this.theatreService = theatreService;
@@ -61,20 +88,23 @@ public class ClientHandler implements Runnable {
         this.paymentService = paymentService;
         this.ticketService = ticketService;
         this.dashboardService = dashboardService;
-        this.osTicketPrinter = osTicketPrinter;
-        this.osSystemInspector = osSystemInspector;
+        this.metricsCounter = metricsCounter;
+        this.notificationService = notificationService;
     }
 
     @Override
     public void run() {
-        String clientIp = clientSocket.getRemoteSocketAddress().toString();
-        logger.info("New Java Socket client connected from {}", clientIp);
+        metricsCounter.registerSocketClientConnected();
+        String clientIp = String.valueOf(clientSocket.getRemoteSocketAddress());
+        System.out.println("[SOCKET] Client connected on " + Thread.currentThread().getName() + " from " + clientIp);
 
-        try (BufferedReader in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
-             PrintWriter out = new PrintWriter(new OutputStreamWriter(clientSocket.getOutputStream()), true)) {
+        BufferedReader in = null;
+        PrintWriter out = null;
+        try {
+            in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
+            out = new PrintWriter(new OutputStreamWriter(clientSocket.getOutputStream()), true);
 
-            // Welcome banner over TCP socket
-            out.println("OK Welcome to CineLuxe Cinema Network Server (Java Sockets Protocol v1.0)");
+            out.println("OK Welcome to CineBook Cinema Network Server (Java TCP Sockets Protocol v1.0)");
 
             String line;
             while ((line = in.readLine()) != null) {
@@ -83,21 +113,28 @@ public class ClientHandler implements Runnable {
                     out.println("OK Goodbye! Session terminated.");
                     break;
                 }
-
                 if (line.isEmpty()) {
                     continue;
                 }
-
                 processCommand(line, out);
             }
         } catch (IOException e) {
-            logger.warn("Socket communication error with {}: {}", clientIp, e.getMessage());
+            System.err.println("[SOCKET] Communication ended with " + clientIp + ": " + e.getMessage());
         } finally {
+            AuthService.clearCurrentSessionUser();
+            metricsCounter.registerSocketClientDisconnected();
+            if (in != null) {
+                try {
+                    in.close();
+                } catch (IOException ignored) {
+                }
+            }
+            if (out != null) {
+                out.close();
+            }
             try {
                 clientSocket.close();
-                logger.info("Socket connection closed for {}", clientIp);
-            } catch (IOException e) {
-                logger.error("Error closing socket: {}", e.getMessage());
+            } catch (IOException ignored) {
             }
         }
     }
@@ -108,74 +145,55 @@ public class ClientHandler implements Runnable {
         String args = tokens.length > 1 ? tokens[1].trim() : "";
 
         try {
-            switch (command) {
-                case "PING":
-                    out.println("OK PONG");
-                    break;
-
-                case "REGISTER":
-                    handleRegister(args, out);
-                    break;
-
-                case "LOGIN":
-                    handleLogin(args, out);
-                    break;
-
-                case "WHOAMI":
-                    handleWhoAmI(out);
-                    break;
-
-                case "MOVIES":
-                    handleListMovies(out);
-                    break;
-
-                case "SEARCH":
-                    handleSearchMovies(args, out);
-                    break;
-
-                case "SHOWS":
-                    handleListShows(args, out);
-                    break;
-
-                case "SEATS":
-                    handleViewSeats(args, out);
-                    break;
-
-                case "BOOK":
-                    handleBook(args, out);
-                    break;
-
-                case "MY_BOOKINGS":
-                    handleMyBookings(out);
-                    break;
-
-                case "CANCEL":
-                    handleCancelBooking(args, out);
-                    break;
-
-                case "PRINT_TICKET":
-                    handlePrintTicket(args, out);
-                    break;
-
-                case "OS_INFO":
-                    handleOsInfo(out);
-                    break;
-
-                case "ADMIN_STATS":
-                    handleAdminStats(out);
-                    break;
-
-                case "ADMIN_ADD_MOVIE":
-                    handleAdminAddMovie(args, out);
-                    break;
-
-                default:
-                    out.println("ERROR Unknown command: " + command + ". Type HELP for available commands.");
-                    break;
+            if ("PING".equals(command)) {
+                out.println("OK PONG");
+            } else if ("HELP".equals(command)) {
+                handleHelp(out);
+            } else if ("REGISTER".equals(command)) {
+                handleRegister(args, out);
+            } else if ("LOGIN".equals(command)) {
+                handleLogin(args, out);
+            } else if ("WHOAMI".equals(command)) {
+                handleWhoAmI(out);
+            } else if ("MOVIES".equals(command)) {
+                handleListMovies(out);
+            } else if ("SEARCH".equals(command)) {
+                handleSearchMovies(args, out);
+            } else if ("SHOWS".equals(command)) {
+                handleListShows(args, out);
+            } else if ("SEATS".equals(command)) {
+                handleViewSeats(args, out);
+            } else if ("BOOK".equals(command)) {
+                handleBook(args, out);
+            } else if ("MY_BOOKINGS".equals(command)) {
+                handleMyBookings(out);
+            } else if ("CANCEL".equals(command)) {
+                handleCancelBooking(args, out);
+            } else if ("TICKET".equals(command) || "PRINT_TICKET".equals(command)) {
+                handleTicketReceipt(args, out);
+            } else if ("THREAD_INFO".equals(command) || "OS_INFO".equals(command)) {
+                handleThreadAndNetworkInfo(out);
+            } else if ("NET_INFO".equals(command)) {
+                handleNetworkClassesDemo(out);
+            } else if ("ADMIN_STATS".equals(command)) {
+                handleAdminStats(out);
+            } else if ("ADMIN_ADD_MOVIE".equals(command)) {
+                handleAdminAddMovie(args, out);
+            } else {
+                out.println("ERROR Unknown command: " + command + ". Type HELP for available commands.");
             }
         } catch (Exception e) {
             out.println("ERROR " + e.getMessage());
         }
+    }
+
+    private void handleHelp(PrintWriter out) {
+        out.println("DATA_START");
+        out.println("Available Commands: PING, MOVIES, SEARCH <kw>, SHOWS <movieId>, SEATS <showId>,");
+        out.println("REGISTER <name>|<email>|<phone>|<pass>, LOGIN <email>|<pass>, WHOAMI,");
+        out.println("BOOK <showId>|<seatIds>|<CARD/UPI/NET_BANKING>, MY_BOOKINGS, CANCEL <bookingId>,");
+        out.println("TICKET <bookingRef>, NET_INFO, THREAD_INFO, ADMIN_STATS, ADMIN_ADD_MOVIE, QUIT");
+        out.println("DATA_END");
     }
 
     private void handleRegister(String args, PrintWriter out) {
@@ -188,7 +206,8 @@ public class ClientHandler implements Runnable {
         AuthResponse res = authService.register(req);
         this.authenticatedUser = authService.getCurrentUser(res.getUser().getEmail());
         AuthService.setCurrentSessionUser(this.authenticatedUser);
-        out.println("OK Registration successful! Logged in as: " + res.getUser().getFullName() + " (" + res.getUser().getEmail() + ")");
+        out.println("OK Registration successful! Logged in as: " + res.getUser().getFullName()
+                + " (" + res.getUser().getEmail() + ")");
     }
 
     private void handleLogin(String args, PrintWriter out) {
@@ -201,14 +220,16 @@ public class ClientHandler implements Runnable {
         AuthResponse res = authService.login(req);
         this.authenticatedUser = authService.getCurrentUser(res.getUser().getEmail());
         AuthService.setCurrentSessionUser(this.authenticatedUser);
-        out.println("OK Login successful! Welcome back, " + res.getUser().getFullName() + " [" + res.getUser().getRole() + "]");
+        out.println("OK Login successful! Welcome back, " + res.getUser().getFullName()
+                + " [" + res.getUser().getRole() + "]");
     }
 
     private void handleWhoAmI(PrintWriter out) {
         if (authenticatedUser == null) {
             out.println("OK Not logged in (Guest session). Use LOGIN or REGISTER.");
         } else {
-            out.println("OK Logged in as " + authenticatedUser.getFullName() + " (" + authenticatedUser.getEmail() + ") - Role: " + authenticatedUser.getRole());
+            out.println("OK Logged in as " + authenticatedUser.getFullName()
+                    + " (" + authenticatedUser.getEmail() + ") - Role: " + authenticatedUser.getRole());
         }
     }
 
@@ -217,7 +238,8 @@ public class ClientHandler implements Runnable {
         out.println("DATA_START");
         out.println("ID | Title | Genre | Language | Duration | Rating");
         out.println("------------------------------------------------------------------");
-        for (MovieResponse m : movies) {
+        for (int i = 0; i < movies.size(); i++) {
+            MovieResponse m = movies.get(i);
             out.println(String.format("%d | %s | %s | %s | %d mins | %s",
                     m.getId(), m.getTitle(), m.getGenre(), m.getLanguage(), m.getDurationMinutes(), m.getRating()));
         }
@@ -234,7 +256,8 @@ public class ClientHandler implements Runnable {
         out.println("Search Results for: " + keyword);
         out.println("ID | Title | Genre | Language | Duration | Rating");
         out.println("------------------------------------------------------------------");
-        for (MovieResponse m : movies) {
+        for (int i = 0; i < movies.size(); i++) {
+            MovieResponse m = movies.get(i);
             out.println(String.format("%d | %s | %s | %s | %d mins | %s",
                     m.getId(), m.getTitle(), m.getGenre(), m.getLanguage(), m.getDurationMinutes(), m.getRating()));
         }
@@ -246,13 +269,14 @@ public class ClientHandler implements Runnable {
             out.println("ERROR Usage: SHOWS <MovieId>");
             return;
         }
-        Long movieId = Long.parseLong(args.trim());
+        Long movieId = Long.valueOf(Long.parseLong(args.trim()));
         List<ShowResponse> shows = showService.getUpcomingShowsByMovie(movieId);
         out.println("DATA_START");
         out.println("Shows for Movie ID " + movieId + ":");
         out.println("ShowID | Theatre | Screen | Date | Time | Status");
         out.println("------------------------------------------------------------------");
-        for (ShowResponse s : shows) {
+        for (int i = 0; i < shows.size(); i++) {
+            ShowResponse s = shows.get(i);
             out.println(String.format("%d | %s | %s | %s | %s | %s",
                     s.getId(), s.getTheatreName(), s.getScreenName(), s.getShowDate(), s.getStartTime(), s.getStatus()));
         }
@@ -264,19 +288,23 @@ public class ClientHandler implements Runnable {
             out.println("ERROR Usage: SEATS <ShowId>");
             return;
         }
-        Long showId = Long.parseLong(args.trim());
+        Long showId = Long.valueOf(Long.parseLong(args.trim()));
         SeatLayoutResponse layout = seatService.getSeatLayoutForShow(showId);
         out.println("DATA_START");
         out.println("=== Seat Layout for: " + layout.getTheatreName() + " (" + layout.getScreenName() + ") ===");
         out.println("Total Seats: " + layout.getTotalSeats() + " | Total Rows: " + layout.getTotalRows());
         out.println("------------------------------------------------------------------");
 
-        for (var entry : layout.getRows().entrySet()) {
+        for (Map.Entry<String, List<SeatDto>> entry : layout.getRows().entrySet()) {
             StringBuilder rowStr = new StringBuilder();
             rowStr.append(String.format("Row %-2s : ", entry.getKey()));
-            for (SeatDto seat : entry.getValue()) {
+            List<SeatDto> rowSeats = entry.getValue();
+            for (int i = 0; i < rowSeats.size(); i++) {
+                SeatDto seat = rowSeats.get(i);
                 boolean avail = "AVAILABLE".equalsIgnoreCase(seat.getStatus());
-                String statusMark = avail ? String.format("[%d:Rs.%.0f]", seat.getId(), seat.getPrice()) : "[ X ]";
+                String statusMark = avail
+                        ? String.format("[%d:Rs.%.0f]", seat.getId(), seat.getPrice())
+                        : "[ X ]";
                 rowStr.append(statusMark).append(" ");
             }
             out.println(rowStr.toString());
@@ -293,34 +321,37 @@ public class ClientHandler implements Runnable {
             return;
         }
 
-        Long showId = Long.parseLong(parts[0].trim());
-        List<Long> seatIds = Arrays.stream(parts[1].trim().split(","))
-                .map(String::trim)
-                .map(Long::parseLong)
-                .collect(Collectors.toList());
-        PaymentMethod paymentMethod = PaymentMethod.valueOf(parts[2].trim().toUpperCase());
+        Long showId = Long.valueOf(Long.parseLong(parts[0].trim()));
+        String[] rawSeatTokens = parts[1].trim().split(",");
+        List<Long> seatIds = new ArrayList<Long>();
+        for (int i = 0; i < rawSeatTokens.length; i++) {
+            String token = rawSeatTokens[i].trim();
+            if (!token.isEmpty()) {
+                seatIds.add(Long.valueOf(Long.parseLong(token)));
+            }
+        }
+
+        String paymentMethod = parts[2].trim().toUpperCase();
+        if (!PaymentMethod.isValid(paymentMethod)) {
+            out.println("ERROR Allowed Payment Methods: CARD, UPI, NET_BANKING");
+            return;
+        }
 
         AuthService.setCurrentSessionUser(this.authenticatedUser);
 
-        // 1. Create temporary reservation
         BookingRequest bookingReq = new BookingRequest(showId, seatIds);
         BookingResponse booking = bookingService.createBooking(bookingReq);
 
-        // 2. Process payment (Strategy Pattern)
         PaymentRequest paymentReq = new PaymentRequest(booking.getBookingReference(), paymentMethod, "SUCCESS");
-        PaymentResponse payment = paymentService.processPayment(paymentReq);
+        paymentService.processPayment(paymentReq);
 
-        // 3. Generate Ticket
         TicketResponse ticket = ticketService.getTicket(booking.getBookingReference());
-
-        // 4. OS Integration (Concept 6): Print ticket to OS filesystem and launch viewer
-        Path ticketFilePath = osTicketPrinter.printTicketToOs(ticket);
 
         out.println("OK BOOKING CONFIRMED!");
         out.println("OK Booking Reference: " + ticket.getBookingReference());
+        out.println("OK Ticket Number: " + ticket.getTicketNumber() + " (" + ticket.getVerificationCode() + ")");
         out.println("OK Total Paid: Rs. " + ticket.getTotalAmount());
-        out.println("OK Seats: " + String.join(", ", ticket.getSeatNumbers()));
-        out.println("OK Ticket receipt written to OS filesystem: " + ticketFilePath.toAbsolutePath());
+        out.println("OK Seats: " + joinStrings(ticket.getSeatNumbers(), ", "));
     }
 
     private void handleMyBookings(PrintWriter out) {
@@ -335,7 +366,8 @@ public class ClientHandler implements Runnable {
         } else {
             out.println("ID | Booking Ref | Movie | Date & Time | Seats | Total (Rs) | Status");
             out.println("------------------------------------------------------------------");
-            for (BookingResponse b : bookings) {
+            for (int i = 0; i < bookings.size(); i++) {
+                BookingResponse b = bookings.get(i);
                 out.println(String.format("%d | %s | %s | %s %s | %s | %.2f | %s",
                         b.getId(), b.getBookingReference(), b.getMovieTitle(), b.getShowDate(), b.getStartTime(),
                         b.getSeatNumbers(), b.getTotalAmount(), b.getBookingStatus()));
@@ -350,25 +382,100 @@ public class ClientHandler implements Runnable {
             out.println("ERROR Usage: CANCEL <BookingId>");
             return;
         }
-        Long bookingId = Long.parseLong(args.trim());
+        Long bookingId = Long.valueOf(Long.parseLong(args.trim()));
         AuthService.setCurrentSessionUser(this.authenticatedUser);
         BookingResponse res = bookingService.cancelBooking(bookingId);
-        out.println("OK Booking " + res.getBookingReference() + " successfully cancelled. Seats have been released back to availability.");
+        out.println("OK Booking " + res.getBookingReference()
+                + " successfully cancelled. Seats have been released back to availability.");
     }
 
-    private void handlePrintTicket(String args, PrintWriter out) {
+    private void handleTicketReceipt(String args, PrintWriter out) {
         if (args.isEmpty()) {
-            out.println("ERROR Usage: PRINT_TICKET <BookingReference>");
+            out.println("ERROR Usage: TICKET <BookingReference>");
             return;
         }
+        ensureAuthenticated();
+        AuthService.setCurrentSessionUser(this.authenticatedUser);
         TicketResponse ticket = ticketService.getTicket(args.trim());
-        Path path = osTicketPrinter.printTicketToOs(ticket);
-        out.println("OK Ticket receipt generated and opened via OS ProcessBuilder: " + path.toAbsolutePath());
+        out.println("DATA_START");
+        out.println("==================================================================");
+        out.println("                 CINEBOOK DIGITAL TICKET RECEIPT                  ");
+        out.println("==================================================================");
+        out.println(" Ticket Number     : " + ticket.getTicketNumber());
+        out.println(" Booking Reference : " + ticket.getBookingReference());
+        out.println(" Verification Code : " + ticket.getVerificationCode());
+        out.println(" Customer          : " + ticket.getCustomerName() + " (" + ticket.getCustomerEmail() + ")");
+        out.println(" Movie             : " + ticket.getMovieTitle() + " [" + ticket.getMovieLanguage() + "]");
+        out.println(" Theatre           : " + ticket.getTheatreName() + ", " + ticket.getTheatreLocation());
+        out.println(" Screen            : " + ticket.getScreenName() + " (" + ticket.getScreenType() + ")");
+        out.println(" Show Date & Time  : " + ticket.getShowDate() + " at " + ticket.getStartTime());
+        out.println(" Seats             : " + joinStrings(ticket.getSeatNumbers(), ", "));
+        out.println(" Amount Paid       : Rs. " + ticket.getTotalAmount() + " [" + ticket.getPaymentStatus() + "]");
+        out.println(" Booking Status    : " + ticket.getBookingStatus());
+        out.println("==================================================================");
+        out.println("DATA_END");
     }
 
-    private void handleOsInfo(PrintWriter out) {
+    /**
+     * Unit 5 & Unit 6 Diagnostics: Displays InetAddress, URL/URLConnection probe,
+     * active worker threads, synchronized counters, Producer-Consumer BoundedBuffer,
+     * and Deadlock-Free Ordered Seat Lock statistics.
+     */
+    private void handleThreadAndNetworkInfo(PrintWriter out) {
         out.println("DATA_START");
-        out.println(osSystemInspector.formatDiagnosticsReport());
+        out.println("==================================================================");
+        out.println("   UNIT 5 (NETWORKING) & UNIT 6 (MULTITHREADING) DIAGNOSTICS      ");
+        out.println("==================================================================");
+        try {
+            InetAddress local = InetAddress.getLocalHost();
+            out.println(" Local HostName (InetAddress)  : " + local.getHostName());
+            out.println(" Local IP Address              : " + local.getHostAddress());
+        } catch (IOException e) {
+            out.println(" Local HostName (InetAddress)  : localhost (127.0.0.1)");
+        }
+        out.println(" Socket Local Port / Client    : " + clientSocket.getLocalPort()
+                + " <-> " + clientSocket.getRemoteSocketAddress());
+        out.println(" Current Socket Worker Thread  : " + Thread.currentThread().getName()
+                + " [" + Thread.currentThread().getState() + "]");
+        out.println(" Active Socket Client Threads  : " + metricsCounter.getActiveSocketClients()
+                + " (Total Connected: " + metricsCounter.getTotalSocketConnections() + ")");
+        out.println(" Notification Consumer Thread  : " + notificationService.getWorkerThreadName()
+                + " [" + notificationService.getWorkerThreadState() + "]");
+        out.println(" BoundedBuffer (wait/notifyAll): " + notificationService.getPendingBufferSize()
+                + " pending / " + notificationService.getBufferCapacity()
+                + " capacity (Processed: " + notificationService.getProcessedCount() + ")");
+        out.println(" Synchronized Booking Counters : Attempts=" + metricsCounter.getBookingAttempts()
+                + ", Confirmed=" + metricsCounter.getConfirmedBookings()
+                + ", Cancelled=" + metricsCounter.getCancelledBookings());
+        out.println(" Deadlock-Free Ordered Locks   : " + metricsCounter.getOrderedLockAcquisitions()
+                + " sorted seat-lock acquisitions");
+        out.println(" Active Theatres Loaded        : " + theatreService.getAllActiveTheatres().size());
+        out.println("==================================================================");
+        out.println("DATA_END");
+    }
+
+    /**
+     * Unit 5: Demonstrates java.net.InetAddress, URL, and URLConnection against the local Spring Boot REST endpoint.
+     */
+    private void handleNetworkClassesDemo(PrintWriter out) {
+        out.println("DATA_START");
+        out.println("=== Unit 5: Java Network Classes (InetAddress, URL, URLConnection) ===");
+        try {
+            InetAddress addr = InetAddress.getLocalHost();
+            out.println("InetAddress Host Name    : " + addr.getHostName());
+            out.println("InetAddress Host Address : " + addr.getHostAddress());
+
+            URL apiUrl = new URL("http://localhost:" + httpPort + "/api/movies/genres");
+            out.println("URL Protocol / Host:Port : " + apiUrl.getProtocol() + "://" + apiUrl.getHost() + ":" + apiUrl.getPort());
+            out.println("URL Path                 : " + apiUrl.getPath());
+
+            URLConnection connection = apiUrl.openConnection();
+            connection.setConnectTimeout(2000);
+            connection.setReadTimeout(2000);
+            out.println("URLConnection ContentType: " + connection.getContentType());
+        } catch (IOException e) {
+            out.println("Network probe warning    : " + e.getMessage());
+        }
         out.println("DATA_END");
     }
 
@@ -376,7 +483,7 @@ public class ClientHandler implements Runnable {
         DashboardStatsDto stats = dashboardService.getDashboardStats();
         out.println("DATA_START");
         out.println("==================================================================");
-        out.println("                 CINELUXE PLATFORM ADMINISTRATIVE STATS            ");
+        out.println("                 CINEBOOK PLATFORM ADMINISTRATIVE STATS           ");
         out.println("==================================================================");
         out.println(" Total Active Movies   : " + stats.getTotalMovies());
         out.println(" Total Theatres        : " + stats.getTotalTheatres());
@@ -400,7 +507,7 @@ public class ClientHandler implements Runnable {
         req.setTitle(parts[0].trim());
         req.setGenre(parts[1].trim());
         req.setLanguage(parts[2].trim());
-        req.setDurationMinutes(Integer.parseInt(parts[3].trim()));
+        req.setDurationMinutes(Integer.valueOf(Integer.parseInt(parts[3].trim())));
         req.setRating(parts[4].trim());
         req.setDescription(parts[5].trim());
         req.setStatus(MovieStatus.NOW_SHOWING);
@@ -417,8 +524,22 @@ public class ClientHandler implements Runnable {
 
     private void ensureAdmin() {
         ensureAuthenticated();
-        if (this.authenticatedUser.getRole() != UserRole.ADMIN) {
+        if (!UserRole.ADMIN.equals(this.authenticatedUser.getRole())) {
             throw new SecurityException("Administrative privileges required for this operation.");
         }
+    }
+
+    private String joinStrings(List<String> items, String delimiter) {
+        if (items == null || items.isEmpty()) {
+            return "";
+        }
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < items.size(); i++) {
+            if (i > 0) {
+                sb.append(delimiter);
+            }
+            sb.append(items.get(i));
+        }
+        return sb.toString();
     }
 }

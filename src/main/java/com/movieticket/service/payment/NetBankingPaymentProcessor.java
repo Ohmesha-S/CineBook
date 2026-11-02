@@ -1,42 +1,31 @@
 package com.movieticket.service.payment;
 
-import com.movieticket.dto.PaymentRequest;
-import com.movieticket.dto.PaymentResponse;
 import com.movieticket.enums.PaymentMethod;
-import com.movieticket.enums.PaymentStatus;
-import com.movieticket.model.Booking;
-import com.movieticket.model.Payment;
 import org.springframework.stereotype.Component;
 
-import java.time.LocalDateTime;
-import java.util.UUID;
-
+/**
+ * Unit 1: Concrete subclass overriding abstract methods of AbstractPaymentProcessor.
+ */
 @Component
-public class NetBankingPaymentProcessor implements PaymentProcessor {
+public class NetBankingPaymentProcessor extends AbstractPaymentProcessor {
 
     @Override
-    public PaymentMethod getSupportedMethod() {
+    public String getSupportedMethod() {
         return PaymentMethod.NET_BANKING;
     }
 
     @Override
-    public PaymentResponse processPayment(Booking booking, PaymentRequest request) {
-        boolean isSuccess = !"FAIL".equalsIgnoreCase(request.getSimulateOutcome());
+    protected String getReferencePrefix() {
+        return "NB-SIM";
+    }
 
-        String ref = "NB-SIM-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
-        Payment payment = new Payment(
-                booking,
-                ref,
-                PaymentMethod.NET_BANKING,
-                booking.getTotalAmount(),
-                isSuccess ? PaymentStatus.SUCCESS : PaymentStatus.FAILED
-        );
-        payment.setTransactionTime(LocalDateTime.now());
+    @Override
+    protected String getSuccessMessage() {
+        return "Net Banking simulated payment completed successfully.";
+    }
 
-        String message = isSuccess
-                ? "Net Banking simulated payment completed successfully."
-                : "Net Banking payment simulation failed (Simulated bank server error).";
-
-        return PaymentResponse.fromEntity(payment, booking.getBookingReference(), message);
+    @Override
+    protected String getFailureMessage() {
+        return "Net Banking payment simulation failed (Simulated bank server error).";
     }
 }

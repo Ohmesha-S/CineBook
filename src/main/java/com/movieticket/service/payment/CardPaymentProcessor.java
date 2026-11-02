@@ -1,42 +1,31 @@
 package com.movieticket.service.payment;
 
-import com.movieticket.dto.PaymentRequest;
-import com.movieticket.dto.PaymentResponse;
 import com.movieticket.enums.PaymentMethod;
-import com.movieticket.enums.PaymentStatus;
-import com.movieticket.model.Booking;
-import com.movieticket.model.Payment;
 import org.springframework.stereotype.Component;
 
-import java.time.LocalDateTime;
-import java.util.UUID;
-
+/**
+ * Unit 1: Concrete subclass overriding abstract methods of AbstractPaymentProcessor.
+ */
 @Component
-public class CardPaymentProcessor implements PaymentProcessor {
+public class CardPaymentProcessor extends AbstractPaymentProcessor {
 
     @Override
-    public PaymentMethod getSupportedMethod() {
+    public String getSupportedMethod() {
         return PaymentMethod.CARD;
     }
 
     @Override
-    public PaymentResponse processPayment(Booking booking, PaymentRequest request) {
-        boolean isSuccess = !"FAIL".equalsIgnoreCase(request.getSimulateOutcome());
+    protected String getReferencePrefix() {
+        return "CARD-SIM";
+    }
 
-        String ref = "CARD-SIM-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
-        Payment payment = new Payment(
-                booking,
-                ref,
-                PaymentMethod.CARD,
-                booking.getTotalAmount(),
-                isSuccess ? PaymentStatus.SUCCESS : PaymentStatus.FAILED
-        );
-        payment.setTransactionTime(LocalDateTime.now());
+    @Override
+    protected String getSuccessMessage() {
+        return "Credit/Debit Card payment simulation completed successfully.";
+    }
 
-        String message = isSuccess
-                ? "Credit/Debit Card payment simulation completed successfully."
-                : "Card payment simulation failed (Simulated bank decline).";
-
-        return PaymentResponse.fromEntity(payment, booking.getBookingReference(), message);
+    @Override
+    protected String getFailureMessage() {
+        return "Card payment simulation failed (Simulated bank decline).";
     }
 }

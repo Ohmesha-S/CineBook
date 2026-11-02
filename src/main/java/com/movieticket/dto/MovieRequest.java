@@ -1,33 +1,23 @@
 package com.movieticket.dto;
 
 import com.movieticket.enums.MovieStatus;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
+
 import java.time.LocalDate;
 
 public class MovieRequest {
 
-    @NotBlank(message = "Title is required")
     private String title;
-
     private String description;
-
-    @NotBlank(message = "Genre is required")
     private String genre;
-
-    @NotBlank(message = "Language is required")
     private String language;
-
-    @NotNull(message = "Duration in minutes is required")
     private Integer durationMinutes;
-
     private String rating;
     private LocalDate releaseDate;
     private String posterUrl;
     private String backdropUrl;
     private String director;
     private String cast;
-    private MovieStatus status = MovieStatus.NOW_SHOWING;
+    private String status = MovieStatus.NOW_SHOWING;
 
     public MovieRequest() {
     }
@@ -120,11 +110,11 @@ public class MovieRequest {
         this.cast = cast;
     }
 
-    public MovieStatus getStatus() {
+    public String getStatus() {
         return status;
     }
 
-    public void setStatus(MovieStatus status) {
+    public void setStatus(String status) {
         this.status = status;
     }
 }

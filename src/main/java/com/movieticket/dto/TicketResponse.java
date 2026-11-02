@@ -1,6 +1,5 @@
 package com.movieticket.dto;
 
-import com.movieticket.enums.BookingStatus;
 import com.movieticket.model.Booking;
 import com.movieticket.model.BookingSeat;
 
@@ -28,9 +27,9 @@ public class TicketResponse {
     private LocalDate showDate;
     private LocalTime startTime;
     private LocalTime endTime;
-    private List<String> seatNumbers = new ArrayList<>();
+    private List<String> seatNumbers = new ArrayList<String>();
     private Double totalAmount;
-    private BookingStatus bookingStatus;
+    private String bookingStatus;
     private String paymentStatus;
     private LocalDateTime bookingTime;
     private String verificationCode;
@@ -39,7 +38,9 @@ public class TicketResponse {
     }
 
     public static TicketResponse fromBooking(Booking booking, String paymentStatus) {
-        if (booking == null) return null;
+        if (booking == null) {
+            return null;
+        }
         TicketResponse ticket = new TicketResponse();
         ticket.setBookingReference(booking.getBookingReference());
         ticket.setTicketNumber("TKT-" + booking.getBookingReference());
@@ -243,11 +244,11 @@ public class TicketResponse {
         this.totalAmount = totalAmount;
     }
 
-    public BookingStatus getBookingStatus() {
+    public String getBookingStatus() {
         return bookingStatus;
     }
 
-    public void setBookingStatus(BookingStatus bookingStatus) {
+    public void setBookingStatus(String bookingStatus) {
         this.bookingStatus = bookingStatus;
     }
 

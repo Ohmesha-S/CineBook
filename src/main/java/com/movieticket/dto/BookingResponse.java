@@ -3,6 +3,7 @@ package com.movieticket.dto;
 import com.movieticket.enums.BookingStatus;
 import com.movieticket.model.Booking;
 import com.movieticket.model.BookingSeat;
+
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -24,11 +25,11 @@ public class BookingResponse {
     private String screenType;
     private LocalDate showDate;
     private LocalTime startTime;
-    private List<String> seatNumbers = new ArrayList<>();
+    private List<String> seatNumbers = new ArrayList<String>();
     private Double subtotal;
     private Double bookingFee;
     private Double totalAmount;
-    private BookingStatus bookingStatus;
+    private String bookingStatus;
     private LocalDateTime bookingTime;
     private LocalDateTime cancellationTime;
     private boolean eligibleForCancellation;
@@ -37,7 +38,9 @@ public class BookingResponse {
     }
 
     public static BookingResponse fromEntity(Booking booking) {
-        if (booking == null) return null;
+        if (booking == null) {
+            return null;
+        }
         BookingResponse dto = new BookingResponse();
         dto.setId(booking.getId());
         dto.setBookingReference(booking.getBookingReference());
@@ -68,24 +71,29 @@ public class BookingResponse {
         dto.setBookingTime(booking.getBookingTime());
         dto.setCancellationTime(booking.getCancellationTime());
 
-        if (booking.getBookingSeats() != null) {
+        if (booking.getBookingSeats() != null && !booking.getBookingSeats().isEmpty()) {
             double seatsTotal = 0.0;
             for (BookingSeat bs : booking.getBookingSeats()) {
                 if (bs.getSeat() != null) {
                     dto.getSeatNumbers().add(bs.getSeat().getRowLabel() + bs.getSeat().getSeatNumber());
-                    seatsTotal += bs.getPrice();
+                    if (bs.getPrice() != null) {
+                        seatsTotal += bs.getPrice();
+                    }
                 }
             }
             dto.setSubtotal(seatsTotal);
-            dto.setBookingFee(Math.max(0.0, booking.getTotalAmount() - seatsTotal));
+            double total = booking.getTotalAmount() != null ? booking.getTotalAmount() : seatsTotal;
+            dto.setBookingFee(Math.max(0.0, total - seatsTotal));
         } else {
             dto.setSubtotal(booking.getTotalAmount());
             dto.setBookingFee(0.0);
         }
 
-        // Cancellation eligibility: CONFIRMED and before show start time
         boolean eligible = false;
-        if (booking.getBookingStatus() == BookingStatus.CONFIRMED && booking.getShow() != null) {
+        if (BookingStatus.CONFIRMED.equals(booking.getBookingStatus())
+                && booking.getShow() != null
+                && booking.getShow().getShowDate() != null
+                && booking.getShow().getStartTime() != null) {
             LocalDateTime showDateTime = LocalDateTime.of(booking.getShow().getShowDate(), booking.getShow().getStartTime());
             eligible = LocalDateTime.now().isBefore(showDateTime);
         }
@@ -238,11 +246,11 @@ public class BookingResponse {
         this.totalAmount = totalAmount;
     }
 
-    public BookingStatus getBookingStatus() {
+    public String getBookingStatus() {
         return bookingStatus;
     }
 
-    public void setBookingStatus(BookingStatus bookingStatus) {
+    public void setBookingStatus(String bookingStatus) {
         this.bookingStatus = bookingStatus;
     }
 

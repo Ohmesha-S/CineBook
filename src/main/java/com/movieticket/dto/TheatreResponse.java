@@ -15,7 +15,9 @@ public class TheatreResponse {
     }
 
     public static TheatreResponse fromEntity(Theatre theatre) {
-        if (theatre == null) return null;
+        if (theatre == null) {
+            return null;
+        }
         TheatreResponse dto = new TheatreResponse();
         dto.setId(theatre.getId());
         dto.setName(theatre.getName());
@@ -23,15 +25,7 @@ public class TheatreResponse {
         dto.setAddress(theatre.getAddress());
         dto.setContactNumber(theatre.getContactNumber());
         dto.setStatus(theatre.getStatus());
-        try {
-            if (theatre.getScreens() != null && org.hibernate.Hibernate.isInitialized(theatre.getScreens())) {
-                dto.setScreenCount(theatre.getScreens().size());
-            } else {
-                dto.setScreenCount(0);
-            }
-        } catch (Exception e) {
-            dto.setScreenCount(0);
-        }
+        dto.setScreenCount(theatre.getScreenCount());
         return dto;
     }
 

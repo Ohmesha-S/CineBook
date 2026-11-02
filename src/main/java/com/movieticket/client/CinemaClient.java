@@ -1,13 +1,17 @@
 package com.movieticket.client;
 
-import java.io.*;
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.OutputStreamWriter;
+import java.io.PrintWriter;
+import java.net.InetAddress;
 import java.net.Socket;
 import java.util.Scanner;
 
 /**
- * Concept 5: Networking using Java
- * Standalone Interactive Java Console Client connecting to the Cinema Server via TCP Sockets.
- * Run via: java -cp target/classes com.movieticket.client.CinemaClient
+ * Unit 5: Networking using Java - Standalone Interactive Console Client connecting via TCP Socket,
+ * InetAddress, BufferedReader, PrintWriter, and Scanner.
  */
 public class CinemaClient {
 
@@ -37,23 +41,24 @@ public class CinemaClient {
 
     public void start() {
         System.out.println("====================================================================");
-        System.out.println("            CINELUXE CINEMAS - JAVA CONSOLE CLIENT                  ");
-        System.out.println("               (Networking using Java TCP Sockets)                  ");
+        System.out.println("            CINEBOOK CINEMAS - JAVA CONSOLE CLIENT                  ");
+        System.out.println("             (Unit 5: Networking using Java TCP Sockets)            ");
         System.out.println("====================================================================");
-        System.out.println("Connecting to Cinema Server at " + host + ":" + port + "...");
 
         try {
-            this.socket = new Socket(host, port);
+            InetAddress serverAddress = InetAddress.getByName(host);
+            System.out.println("Connecting to Cinema Server at " + serverAddress.getHostName()
+                    + " (" + serverAddress.getHostAddress() + "):" + port + "...");
+
+            this.socket = new Socket(serverAddress, port);
             this.in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
             this.out = new PrintWriter(new OutputStreamWriter(socket.getOutputStream()), true);
 
-            // Read welcome message from server
             String welcome = in.readLine();
             System.out.println(welcome);
             System.out.println();
 
             runMenuLoop();
-
         } catch (IOException e) {
             System.err.println("Could not connect to Cinema Server at " + host + ":" + port);
             System.err.println("Reason: " + e.getMessage());
@@ -70,49 +75,33 @@ public class CinemaClient {
             System.out.print("Enter choice (1-12): ");
             String choice = scanner.nextLine().trim();
 
-            switch (choice) {
-                case "1":
-                    browseMovies();
-                    break;
-                case "2":
-                    searchMovies();
-                    break;
-                case "3":
-                    viewShows();
-                    break;
-                case "4":
-                    viewSeats();
-                    break;
-                case "5":
-                    bookSeats();
-                    break;
-                case "6":
-                    viewMyBookings();
-                    break;
-                case "7":
-                    cancelBooking();
-                    break;
-                case "8":
-                    registerUser();
-                    break;
-                case "9":
-                    loginUser();
-                    break;
-                case "10":
-                    adminOperations();
-                    break;
-                case "11":
-                    showOsDiagnostics();
-                    break;
-                case "12":
-                case "exit":
-                case "quit":
-                    sendCommand("QUIT");
-                    running = false;
-                    break;
-                default:
-                    System.out.println("Invalid option. Please choose between 1 and 12.");
-                    break;
+            if ("1".equals(choice)) {
+                browseMovies();
+            } else if ("2".equals(choice)) {
+                searchMovies();
+            } else if ("3".equals(choice)) {
+                viewShows();
+            } else if ("4".equals(choice)) {
+                viewSeats();
+            } else if ("5".equals(choice)) {
+                bookSeats();
+            } else if ("6".equals(choice)) {
+                viewMyBookings();
+            } else if ("7".equals(choice)) {
+                cancelBooking();
+            } else if ("8".equals(choice)) {
+                registerUser();
+            } else if ("9".equals(choice)) {
+                loginUser();
+            } else if ("10".equals(choice)) {
+                adminOperations();
+            } else if ("11".equals(choice)) {
+                showNetworkAndThreadDiagnostics();
+            } else if ("12".equals(choice) || "exit".equalsIgnoreCase(choice) || "quit".equalsIgnoreCase(choice)) {
+                sendCommand("QUIT");
+                running = false;
+            } else {
+                System.out.println("Invalid option. Please choose between 1 and 12.");
             }
             System.out.println();
         }
@@ -124,13 +113,13 @@ public class CinemaClient {
         System.out.println(" [2] Search Movies by Keyword");
         System.out.println(" [3] View Shows for a Movie");
         System.out.println(" [4] View Seat Layout & Pricing");
-        System.out.println(" [5] Book Movie Tickets & Launch OS Viewer");
+        System.out.println(" [5] Book Movie Tickets & View Digital Receipt");
         System.out.println(" [6] View My Booking History");
         System.out.println(" [7] Cancel a Booking");
         System.out.println(" [8] Register New Customer");
         System.out.println(" [9] Customer / Admin Login");
         System.out.println(" [10] Admin Operations (Stats & Add Movie)");
-        System.out.println(" [11] OS & Hardware Diagnostics (Concept 6: Java OS)");
+        System.out.println(" [11] Networking & Multithreading Diagnostics (Units 5 & 6)");
         System.out.println(" [12] Exit");
         System.out.println("--------------------------------------------------------------------");
     }
@@ -141,7 +130,7 @@ public class CinemaClient {
     }
 
     private void searchMovies() {
-        System.out.print("Enter movie title or genre keyword to search: ");
+        System.out.print("Enter movie title keyword to search: ");
         String keyword = scanner.nextLine().trim();
         sendCommand("SEARCH " + keyword);
         readAndPrintBlockResponse();
@@ -232,16 +221,16 @@ public class CinemaClient {
             System.out.print("Enter Title: ");
             String title = scanner.nextLine().trim();
 
-            System.out.print("Enter Genre (ACTION/DRAMA/COMEDY/SCI_FI/HORROR/ROMANCE/THRILLER/ANIMATION): ");
-            String genre = scanner.nextLine().trim().toUpperCase();
+            System.out.print("Enter Genre: ");
+            String genre = scanner.nextLine().trim();
 
-            System.out.print("Enter Language (ENGLISH/HINDI/TAMIL/TELUGU/KANNADA/MALAYALAM): ");
-            String lang = scanner.nextLine().trim().toUpperCase();
+            System.out.print("Enter Language: ");
+            String lang = scanner.nextLine().trim();
 
             System.out.print("Enter Duration (minutes): ");
             String duration = scanner.nextLine().trim();
 
-            System.out.print("Enter Rating (e.g. 8.5): ");
+            System.out.print("Enter Rating (e.g. PG-13): ");
             String rating = scanner.nextLine().trim();
 
             System.out.print("Enter Synopsis/Description: ");
@@ -252,8 +241,10 @@ public class CinemaClient {
         }
     }
 
-    private void showOsDiagnostics() {
-        sendCommand("OS_INFO");
+    private void showNetworkAndThreadDiagnostics() {
+        sendCommand("THREAD_INFO");
+        readAndPrintBlockResponse();
+        sendCommand("NET_INFO");
         readAndPrintBlockResponse();
     }
 
@@ -264,12 +255,15 @@ public class CinemaClient {
     private void readAndPrintBlockResponse() {
         try {
             String firstLine = in.readLine();
-            if (firstLine == null) return;
-
-            if (firstLine.equals("DATA_START")) {
+            if (firstLine == null) {
+                return;
+            }
+            if ("DATA_START".equals(firstLine)) {
                 String line;
                 while ((line = in.readLine()) != null) {
-                    if (line.equals("DATA_END")) break;
+                    if ("DATA_END".equals(line)) {
+                        break;
+                    }
                     System.out.println(line);
                 }
             } else {
@@ -299,8 +293,7 @@ public class CinemaClient {
             if (socket != null && !socket.isClosed()) {
                 socket.close();
             }
-        } catch (IOException e) {
-            // ignore
+        } catch (IOException ignored) {
         }
     }
 }

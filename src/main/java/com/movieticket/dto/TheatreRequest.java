@@ -1,16 +1,9 @@
 package com.movieticket.dto;
 
-import com.movieticket.model.Theatre;
-import jakarta.validation.constraints.NotBlank;
-
 public class TheatreRequest {
 
-    @NotBlank(message = "Theatre name is required")
     private String name;
-
-    @NotBlank(message = "Location/City is required")
     private String location;
-
     private String address;
     private String contactNumber;
     private String status = "ACTIVE";

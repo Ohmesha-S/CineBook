@@ -12,14 +12,13 @@ import com.movieticket.model.Show;
 import com.movieticket.repository.MovieRepository;
 import com.movieticket.repository.ScreenRepository;
 import com.movieticket.repository.ShowRepository;
+import com.movieticket.util.CollectionUtils;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
 
 @Service
 public class ShowService {
@@ -36,69 +35,67 @@ public class ShowService {
         this.screenRepository = screenRepository;
     }
 
-    @Transactional(readOnly = true)
     public List<ShowResponse> getUpcomingShowsByMovie(Long movieId) {
-        return showRepository.findUpcomingShowsByMovie(movieId, LocalDate.now())
-                .stream()
-                .map(ShowResponse::fromEntity)
-                .collect(Collectors.toList());
+        List<Show> shows = showRepository.findUpcomingShowsByMovie(movieId, LocalDate.now());
+        CollectionUtils.sortNaturally(shows);
+        return toResponseList(shows);
     }
 
-    @Transactional(readOnly = true)
     public List<ShowResponse> getShowsByTheatre(Long theatreId) {
-        return showRepository.findShowsByTheatre(theatreId, LocalDate.now())
-                .stream()
-                .map(ShowResponse::fromEntity)
-                .collect(Collectors.toList());
+        List<Show> shows = showRepository.findShowsByTheatre(theatreId, LocalDate.now());
+        CollectionUtils.sortNaturally(shows);
+        return toResponseList(shows);
     }
 
-    @Transactional(readOnly = true)
     public List<ShowResponse> getShowsByMovieTheatreAndDate(Long movieId, Long theatreId, LocalDate date) {
         LocalDate queryDate = date != null ? date : LocalDate.now();
-        return showRepository.findShowsByMovieTheatreAndDate(movieId, theatreId, queryDate)
-                .stream()
-                .map(ShowResponse::fromEntity)
-                .collect(Collectors.toList());
+        List<Show> shows = showRepository.findShowsByMovieTheatreAndDate(movieId, theatreId, queryDate);
+        CollectionUtils.sortNaturally(shows);
+        return toResponseList(shows);
     }
 
-    @Transactional(readOnly = true)
     public List<LocalDate> getAvailableDatesByMovie(Long movieId) {
         return showRepository.findAvailableDatesByMovie(movieId, LocalDate.now());
     }
 
-    @Transactional(readOnly = true)
     public ShowResponse getShowById(Long id) {
-        Show show = showRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Show not found with id: " + id));
-        return ShowResponse.fromEntity(show);
+        return ShowResponse.fromEntity(getShowEntity(id));
     }
 
     public Show getShowEntity(Long id) {
-        return showRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Show not found with id: " + id));
+        Show show = showRepository.findById(id);
+        if (show == null) {
+            throw new ResourceNotFoundException("Show not found with id: " + id);
+        }
+        return show;
     }
 
-    // Admin Operations
     public List<ShowResponse> adminGetAllShows() {
-        return showRepository.findAll()
-                .stream()
-                .map(ShowResponse::fromEntity)
-                .collect(Collectors.toList());
+        List<Show> shows = showRepository.findAll();
+        CollectionUtils.sortNaturally(shows);
+        return toResponseList(shows);
     }
 
-    @Transactional
     public ShowResponse adminCreateShow(ShowRequest request) {
-        Movie movie = movieRepository.findById(request.getMovieId())
-                .orElseThrow(() -> new ResourceNotFoundException("Movie not found with id: " + request.getMovieId()));
+        if (request == null || request.getMovieId() == null || request.getScreenId() == null
+                || request.getShowDate() == null || request.getStartTime() == null) {
+            throw new BadRequestException("Movie, screen, show date, and start time are required.");
+        }
 
-        if (movie.getStatus() == MovieStatus.INACTIVE) {
+        Movie movie = movieRepository.findById(request.getMovieId());
+        if (movie == null) {
+            throw new ResourceNotFoundException("Movie not found with id: " + request.getMovieId());
+        }
+
+        if (MovieStatus.INACTIVE.equals(movie.getStatus())) {
             throw new BadRequestException("Cannot schedule show for an inactive movie.");
         }
 
-        Screen screen = screenRepository.findById(request.getScreenId())
-                .orElseThrow(() -> new ResourceNotFoundException("Screen not found with id: " + request.getScreenId()));
+        Screen screen = screenRepository.findById(request.getScreenId());
+        if (screen == null) {
+            throw new ResourceNotFoundException("Screen not found with id: " + request.getScreenId());
+        }
 
-        // Date/Time validation
         LocalDate today = LocalDate.now();
         if (request.getShowDate().isBefore(today)) {
             throw new BadRequestException("Show date cannot be in the past.");
@@ -109,14 +106,12 @@ public class ShowService {
             throw new BadRequestException("Show time cannot be in the past for today's schedule.");
         }
 
-        // Calculate end time automatically from movie duration (+ 15 mins buffer) if not provided
         LocalTime endTime = request.getEndTime();
         if (endTime == null) {
             int durationWithCleaning = (movie.getDurationMinutes() != null ? movie.getDurationMinutes() : 120) + 15;
             endTime = startTime.plusMinutes(durationWithCleaning);
         }
 
-        // Overlap validation: Two shows on the same screen must not overlap
         List<Show> conflicts = showRepository.findConflictingShows(screen.getId(), request.getShowDate(), startTime, endTime, null);
         if (!conflicts.isEmpty()) {
             Show conflict = conflicts.get(0);
@@ -140,44 +135,41 @@ public class ShowService {
         return ShowResponse.fromEntity(show);
     }
 
-    @Transactional
     public ShowResponse adminUpdateShow(Long id, ShowRequest request) {
-        Show show = showRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Show not found with id: " + id));
+        Show show = getShowEntity(id);
 
         if (request.getMovieId() != null) {
-            Movie movie = movieRepository.findById(request.getMovieId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Movie not found with id: " + request.getMovieId()));
+            Movie movie = movieRepository.findById(request.getMovieId());
+            if (movie == null) {
+                throw new ResourceNotFoundException("Movie not found with id: " + request.getMovieId());
+            }
             show.setMovie(movie);
         }
 
         if (request.getScreenId() != null) {
-            Screen screen = screenRepository.findById(request.getScreenId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Screen not found with id: " + request.getScreenId()));
+            Screen screen = screenRepository.findById(request.getScreenId());
+            if (screen == null) {
+                throw new ResourceNotFoundException("Screen not found with id: " + request.getScreenId());
+            }
             show.setScreen(screen);
         }
 
         if (request.getShowDate() != null) {
             show.setShowDate(request.getShowDate());
         }
-
         if (request.getStartTime() != null) {
             show.setStartTime(request.getStartTime());
         }
-
         if (request.getEndTime() != null) {
             show.setEndTime(request.getEndTime());
         }
-
         if (request.getStatus() != null) {
             show.setStatus(request.getStatus());
         }
-
         if (request.getPriceMultiplier() != null) {
             show.setPriceMultiplier(request.getPriceMultiplier());
         }
 
-        // Validate conflicts excluding current show
         List<Show> conflicts = showRepository.findConflictingShows(
                 show.getScreen().getId(),
                 show.getShowDate(),
@@ -193,11 +185,20 @@ public class ShowService {
         return ShowResponse.fromEntity(show);
     }
 
-    @Transactional
     public void adminCancelShow(Long id) {
-        Show show = showRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Show not found with id: " + id));
+        Show show = getShowEntity(id);
         show.setStatus(ShowStatus.CANCELLED);
         showRepository.save(show);
+    }
+
+    private List<ShowResponse> toResponseList(List<Show> shows) {
+        List<ShowResponse> list = new ArrayList<ShowResponse>();
+        if (shows == null) {
+            return list;
+        }
+        for (int i = 0; i < shows.size(); i++) {
+            list.add(ShowResponse.fromEntity(shows.get(i)));
+        }
+        return list;
     }
 }

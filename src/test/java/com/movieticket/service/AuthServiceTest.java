@@ -17,11 +17,14 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.util.Optional;
-
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 public class AuthServiceTest {
@@ -40,7 +43,7 @@ public class AuthServiceTest {
     @BeforeEach
     void setUp() {
         sampleUser = new User("Rahul Sharma", "rahul@example.com", "9876543210", "hashed_pwd", UserRole.CUSTOMER);
-        sampleUser.setId(1L);
+        sampleUser.setId(Long.valueOf(1L));
     }
 
     @Test
@@ -48,7 +51,7 @@ public class AuthServiceTest {
     void testRegisterSuccess() {
         RegisterRequest request = new RegisterRequest("Rahul Sharma", "rahul@example.com", "9876543210", "Password@123");
 
-        when(userRepository.existsByEmail("rahul@example.com")).thenReturn(false);
+        when(Boolean.valueOf(userRepository.existsByEmail("rahul@example.com"))).thenReturn(Boolean.FALSE);
         when(passwordEncoder.encode("Password@123")).thenReturn("hashed_pwd");
         when(userRepository.save(any(User.class))).thenReturn(sampleUser);
 
@@ -65,9 +68,14 @@ public class AuthServiceTest {
     @DisplayName("Should throw BadRequestException when registering duplicate email")
     void testRegisterDuplicateEmail() {
         RegisterRequest request = new RegisterRequest("Rahul Sharma", "rahul@example.com", "9876543210", "Password@123");
-        when(userRepository.existsByEmail("rahul@example.com")).thenReturn(true);
+        when(Boolean.valueOf(userRepository.existsByEmail("rahul@example.com"))).thenReturn(Boolean.TRUE);
 
-        assertThrows(BadRequestException.class, () -> authService.register(request));
+        try {
+            authService.register(request);
+            fail("Expected BadRequestException");
+        } catch (BadRequestException expected) {
+            assertNotNull(expected.getMessage());
+        }
         verify(userRepository, never()).save(any(User.class));
     }
 
@@ -76,8 +84,8 @@ public class AuthServiceTest {
     void testLoginSuccess() {
         LoginRequest request = new LoginRequest("rahul@example.com", "Password@123");
 
-        when(userRepository.findByEmail("rahul@example.com")).thenReturn(Optional.of(sampleUser));
-        when(passwordEncoder.matches("Password@123", "hashed_pwd")).thenReturn(true);
+        when(userRepository.findByEmail("rahul@example.com")).thenReturn(sampleUser);
+        when(Boolean.valueOf(passwordEncoder.matches("Password@123", "hashed_pwd"))).thenReturn(Boolean.TRUE);
 
         AuthResponse response = authService.login(request);
 
@@ -91,10 +99,15 @@ public class AuthServiceTest {
     void testLoginBadPassword() {
         LoginRequest request = new LoginRequest("rahul@example.com", "WrongPassword");
 
-        when(userRepository.findByEmail("rahul@example.com")).thenReturn(Optional.of(sampleUser));
-        when(passwordEncoder.matches("WrongPassword", "hashed_pwd")).thenReturn(false);
+        when(userRepository.findByEmail("rahul@example.com")).thenReturn(sampleUser);
+        when(Boolean.valueOf(passwordEncoder.matches("WrongPassword", "hashed_pwd"))).thenReturn(Boolean.FALSE);
 
-        assertThrows(UnauthorizedException.class, () -> authService.login(request));
+        try {
+            authService.login(request);
+            fail("Expected UnauthorizedException");
+        } catch (UnauthorizedException expected) {
+            assertNotNull(expected.getMessage());
+        }
     }
 
     @Test
@@ -102,8 +115,13 @@ public class AuthServiceTest {
     void testLoginUserNotFound() {
         LoginRequest request = new LoginRequest("nonexistent@example.com", "Password@123");
 
-        when(userRepository.findByEmail("nonexistent@example.com")).thenReturn(Optional.empty());
+        when(userRepository.findByEmail("nonexistent@example.com")).thenReturn(null);
 
-        assertThrows(UnauthorizedException.class, () -> authService.login(request));
+        try {
+            authService.login(request);
+            fail("Expected UnauthorizedException");
+        } catch (UnauthorizedException expected) {
+            assertNotNull(expected.getMessage());
+        }
     }
 }

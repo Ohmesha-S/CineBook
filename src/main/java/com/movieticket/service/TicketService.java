@@ -29,16 +29,25 @@ public class TicketService {
     }
 
     public TicketResponse getTicket(String bookingReference) {
-        Booking booking = bookingRepository.findByBookingReference(bookingReference)
-                .orElseThrow(() -> new ResourceNotFoundException("Booking not found with reference: " + bookingReference));
+        return getTicketForUser(bookingReference, authService.getCurrentAuthenticatedUser());
+    }
 
-        User currentUser = authService.getCurrentAuthenticatedUser();
-        if (currentUser.getRole() != UserRole.ADMIN && !booking.getUser().getId().equals(currentUser.getId())) {
+    public TicketResponse getTicket(String bookingReference, String authHeader) {
+        return getTicketForUser(bookingReference, authService.resolveUserFromHeader(authHeader));
+    }
+
+    private TicketResponse getTicketForUser(String bookingReference, User currentUser) {
+        Booking booking = bookingRepository.findByBookingReference(bookingReference);
+        if (booking == null) {
+            throw new ResourceNotFoundException("Booking not found with reference: " + bookingReference);
+        }
+
+        if (!UserRole.ADMIN.equals(currentUser.getRole()) && !booking.getUser().getId().equals(currentUser.getId())) {
             throw new UnauthorizedException("You are not authorized to view this ticket.");
         }
 
         List<Payment> payments = paymentRepository.findByBookingId(booking.getId());
-        String paymentStatus = payments.isEmpty() ? "PENDING" : payments.get(payments.size() - 1).getPaymentStatus().name();
+        String paymentStatus = payments.isEmpty() ? "PENDING" : payments.get(0).getPaymentStatus();
 
         return TicketResponse.fromBooking(booking, paymentStatus);
     }

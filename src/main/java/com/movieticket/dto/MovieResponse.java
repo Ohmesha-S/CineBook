@@ -1,7 +1,7 @@
 package com.movieticket.dto;
 
-import com.movieticket.enums.MovieStatus;
 import com.movieticket.model.Movie;
+
 import java.time.LocalDate;
 
 public class MovieResponse {
@@ -17,13 +17,15 @@ public class MovieResponse {
     private String backdropUrl;
     private String director;
     private String cast;
-    private MovieStatus status;
+    private String status;
 
     public MovieResponse() {
     }
 
     public static MovieResponse fromEntity(Movie movie) {
-        if (movie == null) return null;
+        if (movie == null) {
+            return null;
+        }
         MovieResponse dto = new MovieResponse();
         dto.setId(movie.getId());
         dto.setTitle(movie.getTitle());
@@ -137,11 +139,11 @@ public class MovieResponse {
         this.cast = cast;
     }
 
-    public MovieStatus getStatus() {
+    public String getStatus() {
         return status;
     }
 
-    public void setStatus(MovieStatus status) {
+    public void setStatus(String status) {
         this.status = status;
     }
 }

@@ -1,42 +1,31 @@
 package com.movieticket.service.payment;
 
-import com.movieticket.dto.PaymentRequest;
-import com.movieticket.dto.PaymentResponse;
 import com.movieticket.enums.PaymentMethod;
-import com.movieticket.enums.PaymentStatus;
-import com.movieticket.model.Booking;
-import com.movieticket.model.Payment;
 import org.springframework.stereotype.Component;
 
-import java.time.LocalDateTime;
-import java.util.UUID;
-
+/**
+ * Unit 1: Concrete subclass overriding abstract methods of AbstractPaymentProcessor.
+ */
 @Component
-public class UpiPaymentProcessor implements PaymentProcessor {
+public class UpiPaymentProcessor extends AbstractPaymentProcessor {
 
     @Override
-    public PaymentMethod getSupportedMethod() {
+    public String getSupportedMethod() {
         return PaymentMethod.UPI;
     }
 
     @Override
-    public PaymentResponse processPayment(Booking booking, PaymentRequest request) {
-        boolean isSuccess = !"FAIL".equalsIgnoreCase(request.getSimulateOutcome());
+    protected String getReferencePrefix() {
+        return "UPI-SIM";
+    }
 
-        String ref = "UPI-SIM-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
-        Payment payment = new Payment(
-                booking,
-                ref,
-                PaymentMethod.UPI,
-                booking.getTotalAmount(),
-                isSuccess ? PaymentStatus.SUCCESS : PaymentStatus.FAILED
-        );
-        payment.setTransactionTime(LocalDateTime.now());
+    @Override
+    protected String getSuccessMessage() {
+        return "Instant UPI payment simulation completed successfully.";
+    }
 
-        String message = isSuccess
-                ? "Instant UPI payment simulation completed successfully."
-                : "UPI payment simulation failed (Simulated VPA timeout).";
-
-        return PaymentResponse.fromEntity(payment, booking.getBookingReference(), message);
+    @Override
+    protected String getFailureMessage() {
+        return "UPI payment simulation failed (Simulated VPA timeout).";
     }
 }

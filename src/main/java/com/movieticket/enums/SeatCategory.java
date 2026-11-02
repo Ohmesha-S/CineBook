@@ -1,17 +1,34 @@
 package com.movieticket.enums;
 
-public enum SeatCategory {
-    REGULAR(150.0),
-    PREMIUM(250.0),
-    RECLINER(400.0);
+/**
+ * Unit 1: Java Fundamentals - Final Class and Static Final Constants.
+ */
+public final class SeatCategory {
 
-    private final double defaultPrice;
+    public static final String REGULAR = "REGULAR";
+    public static final String PREMIUM = "PREMIUM";
+    public static final String RECLINER = "RECLINER";
 
-    SeatCategory(double defaultPrice) {
-        this.defaultPrice = defaultPrice;
+    public static final double REGULAR_PRICE = 150.0;
+    public static final double PREMIUM_PRICE = 250.0;
+    public static final double RECLINER_PRICE = 400.0;
+
+    private SeatCategory() {
     }
 
-    public double getDefaultPrice() {
-        return defaultPrice;
+    public static double getDefaultPrice(String category) {
+        if (RECLINER.equalsIgnoreCase(category)) {
+            return RECLINER_PRICE;
+        }
+        if (PREMIUM.equalsIgnoreCase(category)) {
+            return PREMIUM_PRICE;
+        }
+        return REGULAR_PRICE;
+    }
+
+    public static boolean isValid(String category) {
+        return REGULAR.equals(category)
+                || PREMIUM.equals(category)
+                || RECLINER.equals(category);
     }
 }

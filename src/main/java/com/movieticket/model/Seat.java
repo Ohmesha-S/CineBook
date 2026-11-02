@@ -1,54 +1,52 @@
 package com.movieticket.model;
 
 import com.movieticket.enums.SeatCategory;
-import jakarta.persistence.*;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 
-@Entity
-@Table(name = "seats",
-    uniqueConstraints = {
-        @UniqueConstraint(name = "uk_screen_row_seat", columnNames = {"screen_id", "row_label", "seat_number"})
-    },
-    indexes = {
-        @Index(name = "idx_seat_screen", columnList = "screen_id")
-    }
-)
-public class Seat extends BaseEntity {
+/**
+ * Unit 1 & Unit 2: Inheritance (extends BaseEntity) and Comparable<Seat> for natural row/seat ordering.
+ */
+public class Seat extends BaseEntity implements Comparable<Seat> {
 
-    @ManyToOne(fetch = FetchType.EAGER)
-    @JoinColumn(name = "screen_id", nullable = false)
     private Screen screen;
-
-    @NotBlank(message = "Row label is required")
-    @Column(name = "row_label", nullable = false, length = 10)
     private String rowLabel;
-
-    @NotNull(message = "Seat number is required")
-    @Column(name = "seat_number", nullable = false)
     private Integer seatNumber;
-
-    @Enumerated(EnumType.STRING)
-    @Column(name = "seat_category", nullable = false, length = 30)
-    private SeatCategory seatCategory = SeatCategory.REGULAR;
-
-    @NotNull(message = "Base price is required")
-    @Column(name = "base_price", nullable = false)
+    private String seatCategory = SeatCategory.REGULAR;
     private Double basePrice = 150.0;
-
-    @Column(name = "active", nullable = false)
     private boolean active = true;
 
     public Seat() {
+        super();
     }
 
-    public Seat(Screen screen, String rowLabel, Integer seatNumber, SeatCategory seatCategory, Double basePrice) {
+    public Seat(Screen screen, String rowLabel, Integer seatNumber, String seatCategory, Double basePrice) {
+        super();
         this.screen = screen;
         this.rowLabel = rowLabel;
         this.seatNumber = seatNumber;
-        this.seatCategory = seatCategory;
+        this.seatCategory = (seatCategory != null) ? seatCategory : SeatCategory.REGULAR;
         this.basePrice = basePrice;
         this.active = true;
+    }
+
+    @Override
+    public int compareTo(Seat other) {
+        if (other == null) {
+            return -1;
+        }
+        String r1 = (this.rowLabel != null) ? this.rowLabel : "";
+        String r2 = (other.rowLabel != null) ? other.rowLabel : "";
+        int rowCmp = r1.compareToIgnoreCase(r2);
+        if (rowCmp != 0) {
+            return rowCmp;
+        }
+        Integer n1 = (this.seatNumber != null) ? this.seatNumber : Integer.valueOf(0);
+        Integer n2 = (other.seatNumber != null) ? other.seatNumber : Integer.valueOf(0);
+        return n1.compareTo(n2);
+    }
+
+    @Override
+    public String getEntitySummary() {
+        return "Seat[id=" + getId() + ", label=" + getSeatIdentifier() + ", category=" + seatCategory + "]";
     }
 
     public Screen getScreen() {
@@ -75,11 +73,11 @@ public class Seat extends BaseEntity {
         this.seatNumber = seatNumber;
     }
 
-    public SeatCategory getSeatCategory() {
+    public String getSeatCategory() {
         return seatCategory;
     }
 
-    public void setSeatCategory(SeatCategory seatCategory) {
+    public void setSeatCategory(String seatCategory) {
         this.seatCategory = seatCategory;
     }
 

@@ -20,16 +20,22 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
+import org.mockito.invocation.InvocationOnMock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.stubbing.Answer;
 
 import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Optional;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 public class PaymentServiceTest {
@@ -50,16 +56,17 @@ public class PaymentServiceTest {
 
     @BeforeEach
     void setUp() {
-        List<PaymentProcessor> processors = Arrays.asList(
+        List<PaymentProcessor> processors = Arrays.<PaymentProcessor>asList(
                 new CardPaymentProcessor(),
-                new UpiPaymentProcessor()
-        );
+                new UpiPaymentProcessor());
         paymentService = new PaymentService(bookingRepository, paymentRepository, reservationRepository, processors);
 
-        pendingBooking = new Booking("CB-20261030-XYZ", null, null, 320.0, BookingStatus.PENDING_PAYMENT);
-        pendingBooking.setId(1L);
+        pendingBooking = new Booking("CB-20261030-XYZ", null, null, Double.valueOf(320.0),
+                BookingStatus.PENDING_PAYMENT);
+        pendingBooking.setId(Long.valueOf(1L));
 
-        activeReservation = new ShowSeatReservation(null, null, null, "CB-20261030-XYZ", "HELD", LocalDateTime.now().plusMinutes(10));
+        activeReservation = new ShowSeatReservation(
+                null, null, null, "CB-20261030-XYZ", "HELD", LocalDateTime.now().plusMinutes(10));
     }
 
     @Test
@@ -67,12 +74,16 @@ public class PaymentServiceTest {
     void testSuccessfulPayment() {
         PaymentRequest req = new PaymentRequest("CB-20261030-XYZ", PaymentMethod.CARD, "SUCCESS");
 
-        when(bookingRepository.findByBookingReference("CB-20261030-XYZ")).thenReturn(Optional.of(pendingBooking));
-        when(reservationRepository.findByBookingReference("CB-20261030-XYZ")).thenReturn(List.of(activeReservation));
-        when(paymentRepository.save(any(Payment.class))).thenAnswer(i -> {
-            Payment p = i.getArgument(0);
-            p.setId(50L);
-            return p;
+        when(bookingRepository.findByBookingReference("CB-20261030-XYZ")).thenReturn(pendingBooking);
+        when(reservationRepository.findByBookingReference("CB-20261030-XYZ"))
+                .thenReturn(Arrays.asList(activeReservation));
+        when(paymentRepository.save(any(Payment.class))).thenAnswer(new Answer<Payment>() {
+            @Override
+            public Payment answer(InvocationOnMock invocation) {
+                Payment p = (Payment) invocation.getArgument(0);
+                p.setId(Long.valueOf(50L));
+                return p;
+            }
         });
 
         PaymentResponse response = paymentService.processPayment(req);
@@ -81,8 +92,9 @@ public class PaymentServiceTest {
         assertEquals(PaymentStatus.SUCCESS, response.getPaymentStatus());
         assertEquals(BookingStatus.CONFIRMED, pendingBooking.getBookingStatus());
         assertEquals("CONFIRMED", activeReservation.getStatus());
+        assertEquals(2, paymentService.getProcessorArray().length);
         verify(bookingRepository, times(1)).save(pendingBooking);
-        verify(reservationRepository, times(1)).saveAll(any());
+        verify(reservationRepository, times(1)).save(activeReservation);
     }
 
     @Test
@@ -90,12 +102,16 @@ public class PaymentServiceTest {
     void testFailedPaymentReleasesSeats() {
         PaymentRequest req = new PaymentRequest("CB-20261030-XYZ", PaymentMethod.UPI, "FAIL");
 
-        when(bookingRepository.findByBookingReference("CB-20261030-XYZ")).thenReturn(Optional.of(pendingBooking));
-        when(reservationRepository.findByBookingReference("CB-20261030-XYZ")).thenReturn(List.of(activeReservation));
-        when(paymentRepository.save(any(Payment.class))).thenAnswer(i -> {
-            Payment p = i.getArgument(0);
-            p.setId(51L);
-            return p;
+        when(bookingRepository.findByBookingReference("CB-20261030-XYZ")).thenReturn(pendingBooking);
+        when(reservationRepository.findByBookingReference("CB-20261030-XYZ"))
+                .thenReturn(Arrays.asList(activeReservation));
+        when(paymentRepository.save(any(Payment.class))).thenAnswer(new Answer<Payment>() {
+            @Override
+            public Payment answer(InvocationOnMock invocation) {
+                Payment p = (Payment) invocation.getArgument(0);
+                p.setId(Long.valueOf(51L));
+                return p;
+            }
         });
 
         PaymentResponse response = paymentService.processPayment(req);
@@ -103,7 +119,6 @@ public class PaymentServiceTest {
         assertNotNull(response);
         assertEquals(PaymentStatus.FAILED, response.getPaymentStatus());
         assertEquals(BookingStatus.PAYMENT_FAILED, pendingBooking.getBookingStatus());
-        // Temporary hold should be released so seat is not stuck
         verify(reservationRepository, times(1)).deleteByBookingReference("CB-20261030-XYZ");
         verify(bookingRepository, times(1)).save(pendingBooking);
     }
@@ -111,13 +126,19 @@ public class PaymentServiceTest {
     @Test
     @DisplayName("Payment 3: Expired seat reservation rejection")
     void testExpiredReservationRejection() {
-        activeReservation.setExpiresAt(LocalDateTime.now().minusMinutes(2)); // Expired
+        activeReservation.setExpiresAt(LocalDateTime.now().minusMinutes(2));
         PaymentRequest req = new PaymentRequest("CB-20261030-XYZ", PaymentMethod.CARD, "SUCCESS");
 
-        when(bookingRepository.findByBookingReference("CB-20261030-XYZ")).thenReturn(Optional.of(pendingBooking));
-        when(reservationRepository.findByBookingReference("CB-20261030-XYZ")).thenReturn(List.of(activeReservation));
+        when(bookingRepository.findByBookingReference("CB-20261030-XYZ")).thenReturn(pendingBooking);
+        when(reservationRepository.findByBookingReference("CB-20261030-XYZ"))
+                .thenReturn(Arrays.asList(activeReservation));
 
-        assertThrows(BadRequestException.class, () -> paymentService.processPayment(req));
-        verify(paymentRepository, never()).save(any());
+        try {
+            paymentService.processPayment(req);
+            fail("Expected BadRequestException");
+        } catch (BadRequestException expected) {
+            assertNotNull(expected.getMessage());
+        }
+        verify(paymentRepository, never()).save(any(Payment.class));
     }
 }

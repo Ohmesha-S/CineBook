@@ -1,51 +1,37 @@
 package com.movieticket.model;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
-import jakarta.persistence.*;
-import jakarta.validation.constraints.NotBlank;
 import java.util.ArrayList;
 import java.util.List;
 
-@Entity
-@Table(name = "screens", indexes = {
-    @Index(name = "idx_screen_theatre", columnList = "theatre_id")
-})
+/**
+ * Unit 1: Java Fundamentals - Inheritance, Object Composition, Method Overriding.
+ */
 public class Screen extends BaseEntity {
 
-    @ManyToOne(fetch = FetchType.EAGER)
-    @JoinColumn(name = "theatre_id", nullable = false)
     private Theatre theatre;
-
-    @NotBlank(message = "Screen name is required")
-    @Column(name = "screen_name", nullable = false, length = 60)
     private String screenName;
-
-    @Column(name = "total_rows")
     private Integer totalRows = 5;
-
-    @Column(name = "total_seats")
     private Integer totalSeats = 50;
-
-    @Column(name = "screen_type", length = 50)
     private String screenType = "Dolby Atmos 4K";
-
-    @JsonIgnore
-    @OneToMany(mappedBy = "screen", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    private List<Seat> seats = new ArrayList<>();
-
-    @JsonIgnore
-    @OneToMany(mappedBy = "screen", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    private List<Show> shows = new ArrayList<>();
+    private List<Seat> seats = new ArrayList<Seat>();
+    private List<Show> shows = new ArrayList<Show>();
 
     public Screen() {
+        super();
     }
 
     public Screen(Theatre theatre, String screenName, Integer totalRows, Integer totalSeats, String screenType) {
+        super();
         this.theatre = theatre;
         this.screenName = screenName;
         this.totalRows = totalRows;
         this.totalSeats = totalSeats;
         this.screenType = screenType;
+    }
+
+    @Override
+    public String getEntitySummary() {
+        return "Screen[id=" + getId() + ", name=" + screenName + ", seats=" + totalSeats + "]";
     }
 
     public Theatre getTheatre() {

@@ -2,16 +2,14 @@ package com.movieticket.service.payment;
 
 import com.movieticket.dto.PaymentRequest;
 import com.movieticket.dto.PaymentResponse;
-import com.movieticket.enums.PaymentMethod;
 import com.movieticket.model.Booking;
 
 /**
- * PaymentProcessor demonstrates OOP Polymorphism and the Strategy Design Pattern.
- * Different simulated payment channels (Card, UPI, Net Banking) implement this contract.
+ * Unit 1: Java Fundamentals - Interface defining the polymorphic contract for payment channels.
  */
 public interface PaymentProcessor {
 
-    PaymentMethod getSupportedMethod();
+    String getSupportedMethod();
 
     PaymentResponse processPayment(Booking booking, PaymentRequest request);
 }

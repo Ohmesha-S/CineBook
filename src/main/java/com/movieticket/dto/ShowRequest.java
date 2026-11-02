@@ -1,26 +1,18 @@
 package com.movieticket.dto;
 
 import com.movieticket.enums.ShowStatus;
-import jakarta.validation.constraints.NotNull;
+
 import java.time.LocalDate;
 import java.time.LocalTime;
 
 public class ShowRequest {
 
-    @NotNull(message = "Movie ID is required")
     private Long movieId;
-
-    @NotNull(message = "Screen ID is required")
     private Long screenId;
-
-    @NotNull(message = "Show date is required")
     private LocalDate showDate;
-
-    @NotNull(message = "Start time is required")
     private LocalTime startTime;
-
     private LocalTime endTime;
-    private ShowStatus status = ShowStatus.SCHEDULED;
+    private String status = ShowStatus.SCHEDULED;
     private Double priceMultiplier = 1.0;
 
     public ShowRequest() {
@@ -66,11 +58,11 @@ public class ShowRequest {
         this.endTime = endTime;
     }
 
-    public ShowStatus getStatus() {
+    public String getStatus() {
         return status;
     }
 
-    public void setStatus(ShowStatus status) {
+    public void setStatus(String status) {
         this.status = status;
     }
 

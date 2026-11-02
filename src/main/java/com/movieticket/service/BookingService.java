@@ -1,5 +1,6 @@
 package com.movieticket.service;
 
+import com.movieticket.db.DatabaseManager;
 import com.movieticket.dto.BookingRequest;
 import com.movieticket.dto.BookingResponse;
 import com.movieticket.enums.BookingStatus;
@@ -9,20 +10,41 @@ import com.movieticket.exception.BadRequestException;
 import com.movieticket.exception.BookingConflictException;
 import com.movieticket.exception.ResourceNotFoundException;
 import com.movieticket.exception.UnauthorizedException;
-import com.movieticket.model.*;
-import com.movieticket.repository.*;
-import org.springframework.dao.DataIntegrityViolationException;
+import com.movieticket.model.Booking;
+import com.movieticket.model.BookingSeat;
+import com.movieticket.model.Seat;
+import com.movieticket.model.Show;
+import com.movieticket.model.ShowSeatReservation;
+import com.movieticket.model.User;
+import com.movieticket.model.comparator.BookingTimeDescComparator;
+import com.movieticket.os.BookingMetricsCounter;
+import com.movieticket.os.SeatLockManager;
+import com.movieticket.os.SeatLockTask;
+import com.movieticket.os.TicketNotificationService;
+import com.movieticket.repository.BookingRepository;
+import com.movieticket.repository.BookingSeatRepository;
+import com.movieticket.repository.SeatRepository;
+import com.movieticket.repository.ShowRepository;
+import com.movieticket.repository.ShowSeatReservationRepository;
+import com.movieticket.util.CollectionUtils;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Isolation;
-import org.springframework.transaction.annotation.Transactional;
 
+import com.movieticket.util.PasswordEncoder;
+import java.sql.Connection;
+import java.sql.SQLException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.LocalTime;
-import java.time.format.DateTimeFormatter;
-import java.util.*;
-import java.util.stream.Collectors;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 
+/**
+ * Unit 4 & Unit 6: Booking Service combining manual JDBC ACID transactions (setAutoCommit(false),
+ * commit(), rollback()) with Unit 6 Deadlock-Free Ordered Seat Locking (SeatLockManager),
+ * Synchronized Counters (BookingMetricsCounter), and Producer-Consumer Notifications.
+ */
 @Service
 public class BookingService {
 
@@ -32,211 +54,385 @@ public class BookingService {
     private final ShowRepository showRepository;
     private final SeatRepository seatRepository;
     private final AuthService authService;
+    private final DatabaseManager databaseManager;
+    private final SeatLockManager seatLockManager;
+    private final BookingMetricsCounter metricsCounter;
+    private final TicketNotificationService notificationService;
 
+    @Autowired
     public BookingService(BookingRepository bookingRepository,
                           BookingSeatRepository bookingSeatRepository,
                           ShowSeatReservationRepository reservationRepository,
                           ShowRepository showRepository,
                           SeatRepository seatRepository,
-                          AuthService authService) {
+                          AuthService authService,
+                          DatabaseManager databaseManager,
+                          SeatLockManager seatLockManager,
+                          BookingMetricsCounter metricsCounter,
+                          TicketNotificationService notificationService) {
         this.bookingRepository = bookingRepository;
         this.bookingSeatRepository = bookingSeatRepository;
         this.reservationRepository = reservationRepository;
         this.showRepository = showRepository;
         this.seatRepository = seatRepository;
         this.authService = authService;
+        this.databaseManager = databaseManager;
+        this.seatLockManager = seatLockManager;
+        this.metricsCounter = metricsCounter;
+        this.notificationService = notificationService;
     }
 
     /**
-     * Creates a new booking with temporary seat reservations.
-     * Enforces database transactions and concurrency locking so two users cannot reserve the same seat.
+     * Convenience constructor for standalone unit tests without Spring container.
      */
-    @Transactional(isolation = Isolation.READ_COMMITTED)
-    public BookingResponse createBooking(BookingRequest request) {
-        User currentUser = authService.getCurrentAuthenticatedUser();
+    public BookingService(BookingRepository bookingRepository,
+                          BookingSeatRepository bookingSeatRepository,
+                          ShowSeatReservationRepository reservationRepository,
+                          ShowRepository showRepository,
+                          SeatRepository seatRepository,
+                          AuthService authService) {
+        this(bookingRepository, bookingSeatRepository, reservationRepository,
+             showRepository, seatRepository, authService,
+             null, new SeatLockManager(null), null, null);
+    }
 
+    public BookingResponse createBooking(BookingRequest request) {
+        return createBookingForUser(request, authService.getCurrentAuthenticatedUser());
+    }
+
+    public BookingResponse createBooking(BookingRequest request, String authHeader) {
+        return createBookingForUser(request, authService.resolveUserFromHeader(authHeader));
+    }
+
+    private BookingResponse createBookingForUser(final BookingRequest request, final User currentUser) {
+        if (metricsCounter != null) {
+            metricsCounter.incrementBookingAttempts();
+        }
+
+        if (request == null || request.getShowId() == null) {
+            throw new BadRequestException("Show ID is required.");
+        }
         if (request.getSeatIds() == null || request.getSeatIds().isEmpty()) {
             throw new BadRequestException("Please select at least one seat.");
         }
 
-        Show show = showRepository.findById(request.getShowId())
-                .orElseThrow(() -> new ResourceNotFoundException("Show not found with id: " + request.getShowId()));
-
-        if (show.getStatus() == ShowStatus.CANCELLED) {
-            throw new BadRequestException("This show has been cancelled.");
-        }
-
-        // Validate show is in future
-        LocalDateTime showStart = LocalDateTime.of(show.getShowDate(), show.getStartTime());
-        if (LocalDateTime.now().isAfter(showStart)) {
-            throw new BadRequestException("Cannot book tickets for past shows.");
-        }
-
-        // Cleanup expired holds
-        reservationRepository.cleanupExpiredHolds(LocalDateTime.now());
-
-        // Validate selected seats
-        List<Seat> seats = seatRepository.findByIdIn(request.getSeatIds());
-        if (seats.size() != request.getSeatIds().size()) {
-            throw new BadRequestException("One or more selected seat IDs are invalid.");
-        }
-
-        // Check each seat belongs to show's screen
-        for (Seat s : seats) {
-            if (!s.getScreen().getId().equals(show.getScreen().getId())) {
-                throw new BadRequestException("Seat " + s.getSeatIdentifier() + " does not belong to this screen.");
+        Set<Long> uniqueIdSet = new HashSet<Long>();
+        for (int i = 0; i < request.getSeatIds().size(); i++) {
+            Long sid = request.getSeatIds().get(i);
+            if (sid != null) {
+                uniqueIdSet.add(sid);
             }
         }
+        final List<Long> requestedSeatIds = new ArrayList<Long>(uniqueIdSet);
+        if (requestedSeatIds.isEmpty()) {
+            throw new BadRequestException("Please select at least one valid seat.");
+        }
 
-        // Check for concurrent booking conflicts:
-        // 1. Check if already confirmed in booking_seats
-        for (Seat s : seats) {
-            boolean alreadyBooked = bookingSeatRepository.existsByShowIdAndSeatIdAndStatus(show.getId(), s.getId(), "BOOKED");
-            if (alreadyBooked) {
-                throw new BookingConflictException("Seat " + s.getSeatIdentifier() + " is already booked.");
+        SeatLockTask<BookingResponse> criticalSection = new SeatLockTask<BookingResponse>() {
+            @Override
+            public BookingResponse execute() {
+                return executeCreateBookingTransaction(request.getShowId(), requestedSeatIds, currentUser);
             }
+        };
+
+        if (seatLockManager != null) {
+            return seatLockManager.executeWithOrderedSeatLocks(request.getShowId(), requestedSeatIds, criticalSection);
         }
+        return criticalSection.execute();
+    }
 
-        // 2. Check active reservations in show_seat_reservations
-        List<ShowSeatReservation> activeReservations = reservationRepository.findActiveReservationsByShow(show.getId(), LocalDateTime.now());
-        Set<Long> reservedSeatIds = activeReservations.stream()
-                .map(r -> r.getSeat().getId())
-                .collect(Collectors.toSet());
-
-        for (Seat s : seats) {
-            if (reservedSeatIds.contains(s.getId())) {
-                throw new BookingConflictException("Seat " + s.getSeatIdentifier() + " is currently on hold or booked by another customer.");
-            }
-        }
-
-        // Calculate amount strictly on backend
-        double multiplier = show.getPriceMultiplier() != null ? show.getPriceMultiplier() : 1.0;
-        double subtotal = 0.0;
-        for (Seat s : seats) {
-            double price = Math.round(s.getBasePrice() * multiplier * 100.0) / 100.0;
-            subtotal += price;
-        }
-
-        double convenienceFee = 20.00; // Flat convenience fee
-        double totalAmount = Math.round((subtotal + convenienceFee) * 100.0) / 100.0;
-
-        // Generate unique booking reference
-        String datePrefix = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
-        String randomSuffix = UUID.randomUUID().toString().substring(0, 6).toUpperCase();
-        String bookingReference = "CB-" + datePrefix + "-" + randomSuffix;
-
-        Booking booking = new Booking(bookingReference, currentUser, show, totalAmount, BookingStatus.PENDING_PAYMENT);
-        booking = bookingRepository.save(booking);
-
-        // Save BookingSeat entities and lock seats in show_seat_reservations
-        LocalDateTime holdExpiry = LocalDateTime.now().plusMinutes(10); // 10 minute hold for payment
-        List<BookingSeat> bookingSeats = new ArrayList<>();
-        List<ShowSeatReservation> reservations = new ArrayList<>();
-
+    private BookingResponse executeCreateBookingTransaction(Long showId, List<Long> seatIds, User currentUser) {
+        Connection con = null;
         try {
-            for (Seat s : seats) {
+            if (databaseManager != null) {
+                con = databaseManager.getConnection();
+                if (con != null) {
+                    con.setAutoCommit(false);
+                }
+            }
+
+            Show show = (con != null) ? showRepository.findById(con, showId) : showRepository.findById(showId);
+            if (show == null) {
+                throw new ResourceNotFoundException("Show not found with id: " + showId);
+            }
+
+            if (ShowStatus.CANCELLED.equals(show.getStatus())) {
+                throw new BadRequestException("This show has been cancelled.");
+            }
+
+            LocalDateTime showStart = LocalDateTime.of(show.getShowDate(), show.getStartTime());
+            if (LocalDateTime.now().isAfter(showStart)) {
+                throw new BadRequestException("Cannot book tickets for past shows.");
+            }
+
+            LocalDateTime now = LocalDateTime.now();
+            if (con != null) {
+                reservationRepository.cleanupExpiredHolds(con, now);
+            } else {
+                reservationRepository.cleanupExpiredHolds(now);
+            }
+
+            List<Seat> seats = (con != null) ? seatRepository.findByIdIn(con, seatIds) : seatRepository.findByIdIn(seatIds);
+            if (seats.size() != seatIds.size()) {
+                throw new BadRequestException("One or more selected seat IDs are invalid.");
+            }
+            CollectionUtils.sortNaturally(seats);
+
+            for (int i = 0; i < seats.size(); i++) {
+                Seat s = seats.get(i);
+                if (!s.getScreen().getId().equals(show.getScreen().getId())) {
+                    throw new BadRequestException("Seat " + s.getSeatIdentifier() + " does not belong to this screen.");
+                }
+            }
+
+            for (int i = 0; i < seats.size(); i++) {
+                Seat s = seats.get(i);
+                boolean alreadyBooked = (con != null)
+                        ? bookingSeatRepository.existsByShowIdAndSeatIdAndStatus(con, show.getId(), s.getId(), "BOOKED")
+                        : bookingSeatRepository.existsByShowIdAndSeatIdAndStatus(show.getId(), s.getId(), "BOOKED");
+                if (alreadyBooked) {
+                    throw new BookingConflictException("Seat " + s.getSeatIdentifier() + " is already booked.");
+                }
+            }
+
+            List<ShowSeatReservation> activeReservations = reservationRepository.findActiveReservationsByShow(show.getId(), now);
+            Set<Long> reservedSeatIds = new HashSet<Long>();
+            for (int i = 0; i < activeReservations.size(); i++) {
+                ShowSeatReservation r = activeReservations.get(i);
+                if (r.getSeat() != null && r.getSeat().getId() != null) {
+                    reservedSeatIds.add(r.getSeat().getId());
+                }
+            }
+
+            for (int i = 0; i < seats.size(); i++) {
+                Seat s = seats.get(i);
+                if (reservedSeatIds.contains(s.getId())) {
+                    throw new BookingConflictException("Seat " + s.getSeatIdentifier()
+                            + " is currently on hold or booked by another customer.");
+                }
+            }
+
+            double multiplier = show.getPriceMultiplier() != null ? show.getPriceMultiplier() : 1.0;
+            double subtotal = 0.0;
+            for (int i = 0; i < seats.size(); i++) {
+                Seat s = seats.get(i);
+                double price = Math.round(s.getBasePrice() * multiplier * 100.0) / 100.0;
+                subtotal += price;
+            }
+
+            double convenienceFee = 20.00;
+            double totalAmount = Math.round((subtotal + convenienceFee) * 100.0) / 100.0;
+
+            LocalDate today = LocalDate.now();
+            String datePrefix = String.format("%04d%02d%02d",
+                    Integer.valueOf(today.getYear()),
+                    Integer.valueOf(today.getMonthValue()),
+                    Integer.valueOf(today.getDayOfMonth()));
+            String randomSuffix = PasswordEncoder.generateToken(6);
+            String bookingReference = "CB-" + datePrefix + "-" + randomSuffix;
+
+            Booking booking = new Booking(
+                    bookingReference, currentUser, show, Double.valueOf(totalAmount), BookingStatus.PENDING_PAYMENT);
+            booking = (con != null) ? bookingRepository.save(con, booking) : bookingRepository.save(booking);
+
+            LocalDateTime holdExpiry = LocalDateTime.now().plusMinutes(10);
+            List<BookingSeat> bookingSeats = new ArrayList<BookingSeat>();
+
+            for (int i = 0; i < seats.size(); i++) {
+                Seat s = seats.get(i);
                 double seatPrice = Math.round(s.getBasePrice() * multiplier * 100.0) / 100.0;
-                BookingSeat bs = new BookingSeat(booking, s, show, seatPrice, "BOOKED");
+                BookingSeat bs = new BookingSeat(booking, s, show, Double.valueOf(seatPrice), "BOOKED");
+                bs = (con != null) ? bookingSeatRepository.save(con, bs) : bookingSeatRepository.save(bs);
                 bookingSeats.add(bs);
 
                 ShowSeatReservation reservation = new ShowSeatReservation(
                         show, s, currentUser, bookingReference, "HELD", holdExpiry
                 );
-                reservations.add(reservation);
+                if (con != null) {
+                    reservationRepository.save(con, reservation);
+                } else {
+                    reservationRepository.save(reservation);
+                }
             }
 
-            bookingSeatRepository.saveAll(bookingSeats);
-            reservationRepository.saveAll(reservations);
             booking.setBookingSeats(bookingSeats);
-        } catch (DataIntegrityViolationException ex) {
-            throw new BookingConflictException("One or more selected seats were just reserved by another customer. Please select different seats.");
-        }
 
-        return BookingResponse.fromEntity(booking);
+            if (con != null) {
+                con.commit();
+            }
+
+            if (notificationService != null) {
+                notificationService.publishNotification("BOOKING_HELD ref=" + bookingReference
+                        + " user=" + currentUser.getEmail() + " seats=" + seats.size() + " total=INR " + totalAmount);
+            }
+
+            return BookingResponse.fromEntity(booking);
+        } catch (RuntimeException e) {
+            if (databaseManager != null) {
+                databaseManager.rollbackQuietly(con);
+            }
+            throw e;
+        } catch (SQLException e) {
+            if (databaseManager != null) {
+                databaseManager.rollbackQuietly(con);
+            }
+            throw new RuntimeException("Database transaction failed during booking: " + e.getMessage(), e);
+        } finally {
+            DatabaseManager.closeQuietly(con);
+        }
     }
 
     public BookingResponse getBookingByReference(String bookingReference) {
-        Booking booking = bookingRepository.findByBookingReference(bookingReference)
-                .orElseThrow(() -> new ResourceNotFoundException("Booking not found with reference: " + bookingReference));
+        return getBookingByReferenceForUser(bookingReference, authService.getCurrentAuthenticatedUser());
+    }
 
-        User currentUser = authService.getCurrentAuthenticatedUser();
-        // Only owner or admin can view
-        if (currentUser.getRole() != UserRole.ADMIN && !booking.getUser().getId().equals(currentUser.getId())) {
+    public BookingResponse getBookingByReference(String bookingReference, String authHeader) {
+        return getBookingByReferenceForUser(bookingReference, authService.resolveUserFromHeader(authHeader));
+    }
+
+    private BookingResponse getBookingByReferenceForUser(String bookingReference, User currentUser) {
+        Booking booking = getBookingEntityByReference(bookingReference);
+        if (!UserRole.ADMIN.equals(currentUser.getRole()) && !booking.getUser().getId().equals(currentUser.getId())) {
             throw new UnauthorizedException("You are not authorized to view this booking.");
         }
-
         return BookingResponse.fromEntity(booking);
     }
 
     public Booking getBookingEntityByReference(String reference) {
-        return bookingRepository.findByBookingReference(reference)
-                .orElseThrow(() -> new ResourceNotFoundException("Booking not found with reference: " + reference));
+        Booking booking = bookingRepository.findByBookingReference(reference);
+        if (booking == null) {
+            throw new ResourceNotFoundException("Booking not found with reference: " + reference);
+        }
+        return booking;
     }
 
     public List<BookingResponse> getMyBookings() {
-        User currentUser = authService.getCurrentAuthenticatedUser();
-        return bookingRepository.findByUserIdOrderByCreatedAtDesc(currentUser.getId())
-                .stream()
-                .map(BookingResponse::fromEntity)
-                .collect(Collectors.toList());
+        return getMyBookingsForUser(authService.getCurrentAuthenticatedUser());
+    }
+
+    public List<BookingResponse> getMyBookings(String authHeader) {
+        return getMyBookingsForUser(authService.resolveUserFromHeader(authHeader));
+    }
+
+    private List<BookingResponse> getMyBookingsForUser(User currentUser) {
+        List<Booking> bookings = bookingRepository.findByUserIdOrderByCreatedAtDesc(currentUser.getId());
+        CollectionUtils.sortWithComparator(bookings, new BookingTimeDescComparator());
+        return toResponseList(bookings);
     }
 
     public List<BookingResponse> adminGetAllBookings() {
-        return bookingRepository.findAllByOrderByCreatedAtDesc()
-                .stream()
-                .map(BookingResponse::fromEntity)
-                .collect(Collectors.toList());
+        List<Booking> bookings = bookingRepository.findAllByOrderByCreatedAtDesc();
+        CollectionUtils.sortWithComparator(bookings, new BookingTimeDescComparator());
+        return toResponseList(bookings);
     }
 
-    /**
-     * Cancels an eligible booking and releases all booked seats back into availability.
-     */
-    @Transactional
     public BookingResponse cancelBooking(Long bookingId) {
-        Booking booking = bookingRepository.findById(bookingId)
-                .orElseThrow(() -> new ResourceNotFoundException("Booking not found with id: " + bookingId));
+        return cancelBookingForUser(bookingId, authService.getCurrentAuthenticatedUser());
+    }
 
-        User currentUser = authService.getCurrentAuthenticatedUser();
-        if (currentUser.getRole() != UserRole.ADMIN && !booking.getUser().getId().equals(currentUser.getId())) {
-            throw new UnauthorizedException("You are not authorized to cancel this booking.");
-        }
+    public BookingResponse cancelBooking(Long bookingId, String authHeader) {
+        return cancelBookingForUser(bookingId, authService.resolveUserFromHeader(authHeader));
+    }
 
-        if (booking.getBookingStatus() == BookingStatus.CANCELLED) {
-            throw new BadRequestException("This booking is already cancelled.");
-        }
-
-        // Validate cancellation eligibility based on show start time
-        Show show = booking.getShow();
-        if (show != null) {
-            LocalDateTime showDateTime = LocalDateTime.of(show.getShowDate(), show.getStartTime());
-            if (LocalDateTime.now().isAfter(showDateTime)) {
-                throw new BadRequestException("This booking is no longer eligible for cancellation as the show time has passed.");
-            }
-        }
-
-        // Update booking status
-        booking.setBookingStatus(BookingStatus.CANCELLED);
-        booking.setCancellationTime(LocalDateTime.now());
-
-        // Update booking_seats status
-        List<Long> seatIds = new ArrayList<>();
-        if (booking.getBookingSeats() != null) {
-            for (BookingSeat bs : booking.getBookingSeats()) {
-                bs.setStatus("CANCELLED");
-                if (bs.getSeat() != null) {
-                    seatIds.add(bs.getSeat().getId());
+    private BookingResponse cancelBookingForUser(Long bookingId, User currentUser) {
+        Connection con = null;
+        try {
+            if (databaseManager != null) {
+                con = databaseManager.getConnection();
+                if (con != null) {
+                    con.setAutoCommit(false);
                 }
             }
-            bookingSeatRepository.saveAll(booking.getBookingSeats());
-        }
 
-        // Release show_seat_reservations so seats become available immediately
-        if (show != null && !seatIds.isEmpty()) {
-            reservationRepository.releaseSeats(show.getId(), seatIds);
-        }
-        reservationRepository.deleteByBookingReference(booking.getBookingReference());
+            Booking booking = (con != null) ? bookingRepository.findById(con, bookingId) : bookingRepository.findById(bookingId);
+            if (booking == null) {
+                throw new ResourceNotFoundException("Booking not found with id: " + bookingId);
+            }
 
-        booking = bookingRepository.save(booking);
-        return BookingResponse.fromEntity(booking);
+            if (!UserRole.ADMIN.equals(currentUser.getRole()) && !booking.getUser().getId().equals(currentUser.getId())) {
+                throw new UnauthorizedException("You are not authorized to cancel this booking.");
+            }
+
+            if (BookingStatus.CANCELLED.equals(booking.getBookingStatus())) {
+                throw new BadRequestException("This booking is already cancelled.");
+            }
+
+            Show show = booking.getShow();
+            if (show != null && show.getShowDate() != null && show.getStartTime() != null) {
+                LocalDateTime showDateTime = LocalDateTime.of(show.getShowDate(), show.getStartTime());
+                if (LocalDateTime.now().isAfter(showDateTime)) {
+                    throw new BadRequestException(
+                            "This booking is no longer eligible for cancellation as the show time has passed.");
+                }
+            }
+
+            booking.setBookingStatus(BookingStatus.CANCELLED);
+            booking.setCancellationTime(LocalDateTime.now());
+
+            List<Long> seatIds = new ArrayList<Long>();
+            if (booking.getBookingSeats() != null) {
+                for (int i = 0; i < booking.getBookingSeats().size(); i++) {
+                    BookingSeat bs = booking.getBookingSeats().get(i);
+                    bs.setStatus("CANCELLED");
+                    if (con != null) {
+                        bookingSeatRepository.save(con, bs);
+                    } else {
+                        bookingSeatRepository.save(bs);
+                    }
+                    if (bs.getSeat() != null && bs.getSeat().getId() != null) {
+                        seatIds.add(bs.getSeat().getId());
+                    }
+                }
+            }
+
+            if (show != null && !seatIds.isEmpty()) {
+                if (con != null) {
+                    reservationRepository.releaseSeats(con, show.getId(), seatIds);
+                } else {
+                    reservationRepository.releaseSeats(show.getId(), seatIds);
+                }
+            }
+            if (con != null) {
+                reservationRepository.deleteByBookingReference(con, booking.getBookingReference());
+                booking = bookingRepository.save(con, booking);
+                con.commit();
+            } else {
+                reservationRepository.deleteByBookingReference(booking.getBookingReference());
+                booking = bookingRepository.save(booking);
+            }
+
+            if (metricsCounter != null) {
+                metricsCounter.incrementCancelledBookings();
+            }
+            if (notificationService != null) {
+                notificationService.publishNotification("BOOKING_CANCELLED ref=" + booking.getBookingReference()
+                        + " by=" + currentUser.getEmail());
+            }
+
+            return BookingResponse.fromEntity(booking);
+        } catch (RuntimeException e) {
+            if (databaseManager != null) {
+                databaseManager.rollbackQuietly(con);
+            }
+            throw e;
+        } catch (SQLException e) {
+            if (databaseManager != null) {
+                databaseManager.rollbackQuietly(con);
+            }
+            throw new RuntimeException("Database transaction failed during cancellation: " + e.getMessage(), e);
+        } finally {
+            DatabaseManager.closeQuietly(con);
+        }
+    }
+
+    private List<BookingResponse> toResponseList(List<Booking> bookings) {
+        List<BookingResponse> list = new ArrayList<BookingResponse>();
+        if (bookings == null) {
+            return list;
+        }
+        for (int i = 0; i < bookings.size(); i++) {
+            list.add(BookingResponse.fromEntity(bookings.get(i)));
+        }
+        return list;
     }
 }

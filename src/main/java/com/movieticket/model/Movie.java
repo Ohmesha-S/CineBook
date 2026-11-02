@@ -1,75 +1,39 @@
 package com.movieticket.model;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.movieticket.enums.MovieStatus;
-import jakarta.persistence.*;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
+
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 
-@Entity
-@Table(name = "movies", indexes = {
-    @Index(name = "idx_movie_title", columnList = "title"),
-    @Index(name = "idx_movie_genre", columnList = "genre"),
-    @Index(name = "idx_movie_language", columnList = "language"),
-    @Index(name = "idx_movie_status", columnList = "status")
-})
-public class Movie extends BaseEntity {
+/**
+ * Unit 1 & Unit 2: Inheritance (extends BaseEntity) and Comparable<Movie> interface for natural sorting.
+ */
+public class Movie extends BaseEntity implements Comparable<Movie> {
 
-    @NotBlank(message = "Movie title is required")
-    @Column(name = "title", nullable = false, length = 150)
     private String title;
-
-    @Column(name = "description", columnDefinition = "TEXT")
     private String description;
-
-    @NotBlank(message = "Genre is required")
-    @Column(name = "genre", nullable = false, length = 80)
     private String genre;
-
-    @NotBlank(message = "Language is required")
-    @Column(name = "language", nullable = false, length = 50)
     private String language;
-
-    @NotNull(message = "Duration in minutes is required")
-    @Column(name = "duration_minutes", nullable = false)
     private Integer durationMinutes;
-
-    @Column(name = "rating", length = 10)
-    private String rating; // e.g. "PG-13", "U/A", "R", "8.9"
-
-    @Column(name = "release_date")
+    private String rating;
     private LocalDate releaseDate;
-
-    @Column(name = "poster_url", length = 500)
     private String posterUrl;
-
-    @Column(name = "backdrop_url", length = 500)
     private String backdropUrl;
-
-    @Column(name = "director", length = 100)
     private String director;
-
-    @Column(name = "cast", length = 255)
     private String cast;
-
-    @Enumerated(EnumType.STRING)
-    @Column(name = "status", nullable = false, length = 30)
-    private MovieStatus status = MovieStatus.NOW_SHOWING;
-
-    @JsonIgnore
-    @OneToMany(mappedBy = "movie", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    private List<Show> shows = new ArrayList<>();
+    private String status = MovieStatus.NOW_SHOWING;
+    private List<Show> shows = new ArrayList<Show>();
 
     public Movie() {
+        super();
     }
 
     public Movie(String title, String description, String genre, String language,
                  Integer durationMinutes, String rating, LocalDate releaseDate,
                  String posterUrl, String backdropUrl, String director, String cast,
-                 MovieStatus status) {
+                 String status) {
+        super();
         this.title = title;
         this.description = description;
         this.genre = genre;
@@ -81,7 +45,32 @@ public class Movie extends BaseEntity {
         this.backdropUrl = backdropUrl;
         this.director = director;
         this.cast = cast;
-        this.status = status;
+        this.status = (status != null) ? status : MovieStatus.NOW_SHOWING;
+    }
+
+    @Override
+    public int compareTo(Movie other) {
+        if (other == null) {
+            return -1;
+        }
+        if (this.releaseDate != null && other.releaseDate != null) {
+            int dateCmp = other.releaseDate.compareTo(this.releaseDate);
+            if (dateCmp != 0) {
+                return dateCmp;
+            }
+        } else if (this.releaseDate != null) {
+            return -1;
+        } else if (other.releaseDate != null) {
+            return 1;
+        }
+        String t1 = (this.title != null) ? this.title : "";
+        String t2 = (other.title != null) ? other.title : "";
+        return t1.compareToIgnoreCase(t2);
+    }
+
+    @Override
+    public String getEntitySummary() {
+        return "Movie[id=" + getId() + ", title=" + title + ", status=" + status + "]";
     }
 
     public String getTitle() {
@@ -172,11 +161,11 @@ public class Movie extends BaseEntity {
         this.cast = cast;
     }
 
-    public MovieStatus getStatus() {
+    public String getStatus() {
         return status;
     }
 
-    public void setStatus(MovieStatus status) {
+    public void setStatus(String status) {
         this.status = status;
     }
 

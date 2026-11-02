@@ -1,52 +1,39 @@
 package com.movieticket.model;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.movieticket.enums.PaymentMethod;
 import com.movieticket.enums.PaymentStatus;
-import jakarta.persistence.*;
-import jakarta.validation.constraints.NotNull;
+
 import java.time.LocalDateTime;
 
-@Entity
-@Table(name = "payments", indexes = {
-    @Index(name = "idx_payment_booking", columnList = "booking_id"),
-    @Index(name = "idx_payment_ref", columnList = "payment_reference")
-})
+/**
+ * Unit 1: Java Fundamentals - Inheritance, Constructors, Encapsulation, Method Overriding.
+ */
 public class Payment extends BaseEntity {
 
-    @JsonIgnore
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "booking_id", nullable = false)
     private Booking booking;
-
-    @Column(name = "payment_reference", nullable = false, length = 60)
     private String paymentReference;
-
-    @Enumerated(EnumType.STRING)
-    @Column(name = "payment_method", nullable = false, length = 30)
-    private PaymentMethod paymentMethod = PaymentMethod.CARD;
-
-    @NotNull(message = "Payment amount is required")
-    @Column(name = "amount", nullable = false)
+    private String paymentMethod = PaymentMethod.CARD;
     private Double amount;
-
-    @Enumerated(EnumType.STRING)
-    @Column(name = "payment_status", nullable = false, length = 30)
-    private PaymentStatus paymentStatus = PaymentStatus.INITIATED;
-
-    @Column(name = "transaction_time")
+    private String paymentStatus = PaymentStatus.INITIATED;
     private LocalDateTime transactionTime;
 
     public Payment() {
+        super();
     }
 
-    public Payment(Booking booking, String paymentReference, PaymentMethod paymentMethod, Double amount, PaymentStatus paymentStatus) {
+    public Payment(Booking booking, String paymentReference, String paymentMethod, Double amount, String paymentStatus) {
+        super();
         this.booking = booking;
         this.paymentReference = paymentReference;
-        this.paymentMethod = paymentMethod;
+        this.paymentMethod = (paymentMethod != null) ? paymentMethod : PaymentMethod.CARD;
         this.amount = amount;
-        this.paymentStatus = paymentStatus;
+        this.paymentStatus = (paymentStatus != null) ? paymentStatus : PaymentStatus.INITIATED;
         this.transactionTime = LocalDateTime.now();
+    }
+
+    @Override
+    public String getEntitySummary() {
+        return "Payment[id=" + getId() + ", ref=" + paymentReference + ", status=" + paymentStatus + "]";
     }
 
     public Booking getBooking() {
@@ -65,11 +52,11 @@ public class Payment extends BaseEntity {
         this.paymentReference = paymentReference;
     }
 
-    public PaymentMethod getPaymentMethod() {
+    public String getPaymentMethod() {
         return paymentMethod;
     }
 
-    public void setPaymentMethod(PaymentMethod paymentMethod) {
+    public void setPaymentMethod(String paymentMethod) {
         this.paymentMethod = paymentMethod;
     }
 
@@ -81,11 +68,11 @@ public class Payment extends BaseEntity {
         this.amount = amount;
     }
 
-    public PaymentStatus getPaymentStatus() {
+    public String getPaymentStatus() {
         return paymentStatus;
     }
 
-    public void setPaymentStatus(PaymentStatus paymentStatus) {
+    public void setPaymentStatus(String paymentStatus) {
         this.paymentStatus = paymentStatus;
     }
 

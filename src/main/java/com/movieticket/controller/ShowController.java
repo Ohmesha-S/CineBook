@@ -3,11 +3,15 @@ package com.movieticket.controller;
 import com.movieticket.dto.ApiResponse;
 import com.movieticket.dto.SeatLayoutResponse;
 import com.movieticket.dto.ShowResponse;
+import com.movieticket.exception.BadRequestException;
 import com.movieticket.service.SeatService;
 import com.movieticket.service.ShowService;
-import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -48,8 +52,17 @@ public class ShowController {
     public ResponseEntity<ApiResponse<List<ShowResponse>>> getShowsBySchedule(
             @RequestParam Long movieId,
             @RequestParam Long theatreId,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
-        return ResponseEntity.ok(ApiResponse.success(showService.getShowsByMovieTheatreAndDate(movieId, theatreId, date)));
+            @RequestParam(required = false) String date) {
+        LocalDate parsedDate = null;
+        if (date != null && !date.trim().isEmpty()) {
+            try {
+                parsedDate = LocalDate.parse(date.trim());
+            } catch (Exception e) {
+                throw new BadRequestException("Invalid date format. Expected YYYY-MM-DD.");
+            }
+        }
+        return ResponseEntity.ok(ApiResponse.success(
+                showService.getShowsByMovieTheatreAndDate(movieId, theatreId, parsedDate)));
     }
 
     @GetMapping("/{showId}/seats")

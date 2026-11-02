@@ -1,15 +1,10 @@
 package com.movieticket.dto;
 
-import jakarta.validation.constraints.NotEmpty;
-import jakarta.validation.constraints.NotNull;
 import java.util.List;
 
 public class BookingRequest {
 
-    @NotNull(message = "Show ID is required")
     private Long showId;
-
-    @NotEmpty(message = "Please select at least one seat")
     private List<Long> seatIds;
 
     public BookingRequest() {

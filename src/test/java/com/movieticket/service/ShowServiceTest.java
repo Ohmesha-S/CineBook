@@ -22,13 +22,21 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
-import java.util.Optional;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 public class ShowServiceTest {
@@ -47,33 +55,32 @@ public class ShowServiceTest {
 
     private Movie sampleMovie;
     private Screen sampleScreen;
-    private Theatre sampleTheatre;
     private Show existingShow;
 
     @BeforeEach
     void setUp() {
-        sampleMovie = new Movie("Interstellar", "Space", "Sci-Fi", "English", 169, "PG-13",
+        sampleMovie = new Movie("Interstellar", "Space", "Sci-Fi", "English", Integer.valueOf(169), "PG-13",
                 LocalDate.now(), "p.jpg", "b.jpg", "Nolan", "McConaughey", MovieStatus.NOW_SHOWING);
-        sampleMovie.setId(1L);
+        sampleMovie.setId(Long.valueOf(1L));
 
-        sampleTheatre = new Theatre("PVR Grand", "Chennai", "Velachery", "123", "ACTIVE");
-        sampleTheatre.setId(1L);
+        Theatre sampleTheatre = new Theatre("PVR Grand", "Chennai", "Velachery", "123", "ACTIVE");
+        sampleTheatre.setId(Long.valueOf(1L));
 
-        sampleScreen = new Screen(sampleTheatre, "Screen 1", 5, 50, "IMAX 2D");
-        sampleScreen.setId(1L);
+        sampleScreen = new Screen(sampleTheatre, "Screen 1", Integer.valueOf(5), Integer.valueOf(50), "IMAX 2D");
+        sampleScreen.setId(Long.valueOf(1L));
 
         existingShow = new Show(sampleMovie, sampleScreen, LocalDate.now().plusDays(1),
                 LocalTime.of(14, 0), LocalTime.of(17, 0), ShowStatus.SCHEDULED);
-        existingShow.setId(1L);
+        existingShow.setId(Long.valueOf(1L));
     }
 
     @Test
     @DisplayName("Show 1: Retrieve available shows for movie")
     void testRetrieveAvailableShows() {
-        when(showRepository.findUpcomingShowsByMovie(eq(1L), any(LocalDate.class)))
-                .thenReturn(List.of(existingShow));
+        when(showRepository.findUpcomingShowsByMovie(eq(Long.valueOf(1L)), any(LocalDate.class)))
+                .thenReturn(new ArrayList<Show>(Arrays.asList(existingShow)));
 
-        List<ShowResponse> shows = showService.getUpcomingShowsByMovie(1L);
+        List<ShowResponse> shows = showService.getUpcomingShowsByMovie(Long.valueOf(1L));
 
         assertEquals(1, shows.size());
         assertEquals("Screen 1", shows.get(0).getScreenName());
@@ -84,55 +91,66 @@ public class ShowServiceTest {
     @DisplayName("Show 2: Reject past show scheduling")
     void testRejectPastShowDate() {
         ShowRequest pastRequest = new ShowRequest();
-        pastRequest.setMovieId(1L);
-        pastRequest.setScreenId(1L);
+        pastRequest.setMovieId(Long.valueOf(1L));
+        pastRequest.setScreenId(Long.valueOf(1L));
         pastRequest.setShowDate(LocalDate.now().minusDays(2));
         pastRequest.setStartTime(LocalTime.of(10, 0));
 
-        when(movieRepository.findById(1L)).thenReturn(Optional.of(sampleMovie));
-        when(screenRepository.findById(1L)).thenReturn(Optional.of(sampleScreen));
+        when(movieRepository.findById(Long.valueOf(1L))).thenReturn(sampleMovie);
+        when(screenRepository.findById(Long.valueOf(1L))).thenReturn(sampleScreen);
 
-        assertThrows(BadRequestException.class, () -> showService.adminCreateShow(pastRequest));
-        verify(showRepository, never()).save(any());
+        try {
+            showService.adminCreateShow(pastRequest);
+            fail("Expected BadRequestException");
+        } catch (BadRequestException expected) {
+            assertNotNull(expected.getMessage());
+        }
+        verify(showRepository, never()).save(any(Show.class));
     }
 
     @Test
     @DisplayName("Show 3: Reject overlapping screen schedules")
     void testRejectOverlappingShowSchedule() {
         ShowRequest conflictRequest = new ShowRequest();
-        conflictRequest.setMovieId(1L);
-        conflictRequest.setScreenId(1L);
+        conflictRequest.setMovieId(Long.valueOf(1L));
+        conflictRequest.setScreenId(Long.valueOf(1L));
         conflictRequest.setShowDate(LocalDate.now().plusDays(1));
-        conflictRequest.setStartTime(LocalTime.of(15, 0)); // Overlaps with 14:00 - 17:00
+        conflictRequest.setStartTime(LocalTime.of(15, 0));
 
-        when(movieRepository.findById(1L)).thenReturn(Optional.of(sampleMovie));
-        when(screenRepository.findById(1L)).thenReturn(Optional.of(sampleScreen));
-        when(showRepository.findConflictingShows(eq(1L), eq(conflictRequest.getShowDate()), any(), any(), isNull()))
-                .thenReturn(List.of(existingShow));
+        when(movieRepository.findById(Long.valueOf(1L))).thenReturn(sampleMovie);
+        when(screenRepository.findById(Long.valueOf(1L))).thenReturn(sampleScreen);
+        when(showRepository.findConflictingShows(
+                eq(Long.valueOf(1L)), eq(conflictRequest.getShowDate()), any(LocalTime.class), any(LocalTime.class), (Long) isNull()))
+                .thenReturn(Arrays.asList(existingShow));
 
-        BadRequestException ex = assertThrows(BadRequestException.class, () -> showService.adminCreateShow(conflictRequest));
-        assertTrue(ex.getMessage().contains("Schedule conflict"));
-        verify(showRepository, never()).save(any());
+        try {
+            showService.adminCreateShow(conflictRequest);
+            fail("Expected BadRequestException");
+        } catch (BadRequestException ex) {
+            assertTrue(ex.getMessage().contains("Schedule conflict"));
+        }
+        verify(showRepository, never()).save(any(Show.class));
     }
 
     @Test
     @DisplayName("Show 4: Allow non-conflicting shows on same screen")
     void testAllowNonConflictingShow() {
         ShowRequest validRequest = new ShowRequest();
-        validRequest.setMovieId(1L);
-        validRequest.setScreenId(1L);
+        validRequest.setMovieId(Long.valueOf(1L));
+        validRequest.setScreenId(Long.valueOf(1L));
         validRequest.setShowDate(LocalDate.now().plusDays(1));
-        validRequest.setStartTime(LocalTime.of(18, 0)); // Starts after 17:00
+        validRequest.setStartTime(LocalTime.of(18, 0));
         validRequest.setEndTime(LocalTime.of(21, 0));
 
-        when(movieRepository.findById(1L)).thenReturn(Optional.of(sampleMovie));
-        when(screenRepository.findById(1L)).thenReturn(Optional.of(sampleScreen));
-        when(showRepository.findConflictingShows(eq(1L), eq(validRequest.getShowDate()), any(), any(), isNull()))
-                .thenReturn(Collections.emptyList());
+        when(movieRepository.findById(Long.valueOf(1L))).thenReturn(sampleMovie);
+        when(screenRepository.findById(Long.valueOf(1L))).thenReturn(sampleScreen);
+        when(showRepository.findConflictingShows(
+                eq(Long.valueOf(1L)), eq(validRequest.getShowDate()), any(LocalTime.class), any(LocalTime.class), (Long) isNull()))
+                .thenReturn(Collections.<Show>emptyList());
 
         Show newShow = new Show(sampleMovie, sampleScreen, validRequest.getShowDate(),
                 validRequest.getStartTime(), validRequest.getEndTime(), ShowStatus.SCHEDULED);
-        newShow.setId(2L);
+        newShow.setId(Long.valueOf(2L));
         when(showRepository.save(any(Show.class))).thenReturn(newShow);
 
         ShowResponse created = showService.adminCreateShow(validRequest);

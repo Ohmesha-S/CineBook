@@ -1,6 +1,5 @@
 package com.movieticket.dto;
 
-import com.movieticket.enums.UserRole;
 import com.movieticket.model.User;
 
 public class UserResponse {
@@ -8,12 +7,12 @@ public class UserResponse {
     private String fullName;
     private String email;
     private String phone;
-    private UserRole role;
+    private String role;
 
     public UserResponse() {
     }
 
-    public UserResponse(Long id, String fullName, String email, String phone, UserRole role) {
+    public UserResponse(Long id, String fullName, String email, String phone, String role) {
         this.id = id;
         this.fullName = fullName;
         this.email = email;
@@ -22,7 +21,9 @@ public class UserResponse {
     }
 
     public static UserResponse fromEntity(User user) {
-        if (user == null) return null;
+        if (user == null) {
+            return null;
+        }
         return new UserResponse(
                 user.getId(),
                 user.getFullName(),
@@ -64,11 +65,11 @@ public class UserResponse {
         this.phone = phone;
     }
 
-    public UserRole getRole() {
+    public String getRole() {
         return role;
     }
 
-    public void setRole(UserRole role) {
+    public void setRole(String role) {
         this.role = role;
     }
 }

@@ -4,11 +4,19 @@ import com.movieticket.dto.BookingResponse;
 import com.movieticket.dto.DashboardStatsDto;
 import com.movieticket.enums.BookingStatus;
 import com.movieticket.enums.UserRole;
-import com.movieticket.repository.*;
+import com.movieticket.model.Booking;
+import com.movieticket.model.comparator.BookingTimeDescComparator;
+import com.movieticket.repository.BookingRepository;
+import com.movieticket.repository.MovieRepository;
+import com.movieticket.repository.ScreenRepository;
+import com.movieticket.repository.ShowRepository;
+import com.movieticket.repository.TheatreRepository;
+import com.movieticket.repository.UserRepository;
+import com.movieticket.util.CollectionUtils;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
 
 @Service
 public class DashboardService {
@@ -48,11 +56,14 @@ public class DashboardService {
         Double revenue = bookingRepository.sumRevenueByStatus(BookingStatus.CONFIRMED);
         stats.setTotalRevenue(revenue != null ? Math.round(revenue * 100.0) / 100.0 : 0.0);
 
-        List<BookingResponse> recent = bookingRepository.findAllByOrderByCreatedAtDesc()
-                .stream()
-                .limit(10)
-                .map(BookingResponse::fromEntity)
-                .collect(Collectors.toList());
+        List<Booking> allBookings = bookingRepository.findAllByOrderByCreatedAtDesc();
+        CollectionUtils.sortWithComparator(allBookings, new BookingTimeDescComparator());
+        List<Booking> topTen = CollectionUtils.takeFirst(allBookings, 10);
+
+        List<BookingResponse> recent = new ArrayList<BookingResponse>();
+        for (int i = 0; i < topTen.size(); i++) {
+            recent.add(BookingResponse.fromEntity(topTen.get(i)));
+        }
         stats.setRecentBookings(recent);
 
         return stats;

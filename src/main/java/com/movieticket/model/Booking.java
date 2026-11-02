@@ -1,64 +1,43 @@
 package com.movieticket.model;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.movieticket.enums.BookingStatus;
-import jakarta.persistence.*;
-import jakarta.validation.constraints.NotNull;
+
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
-@Entity
-@Table(name = "bookings", indexes = {
-    @Index(name = "idx_booking_ref", columnList = "booking_reference", unique = true),
-    @Index(name = "idx_booking_user", columnList = "user_id"),
-    @Index(name = "idx_booking_show", columnList = "show_id"),
-    @Index(name = "idx_booking_status", columnList = "booking_status")
-})
+/**
+ * Unit 1: Java Fundamentals - Inheritance, Constructors, Encapsulation, Method Overriding.
+ */
 public class Booking extends BaseEntity {
 
-    @Column(name = "booking_reference", nullable = false, unique = true, length = 50)
     private String bookingReference;
-
-    @ManyToOne(fetch = FetchType.EAGER)
-    @JoinColumn(name = "user_id", nullable = false)
     private User user;
-
-    @ManyToOne(fetch = FetchType.EAGER)
-    @JoinColumn(name = "show_id", nullable = false)
     private Show show;
-
-    @NotNull(message = "Total amount is required")
-    @Column(name = "total_amount", nullable = false)
     private Double totalAmount;
-
-    @Enumerated(EnumType.STRING)
-    @Column(name = "booking_status", nullable = false, length = 30)
-    private BookingStatus bookingStatus = BookingStatus.PENDING_PAYMENT;
-
-    @Column(name = "booking_time")
+    private String bookingStatus = BookingStatus.PENDING_PAYMENT;
     private LocalDateTime bookingTime;
-
-    @Column(name = "cancellation_time")
     private LocalDateTime cancellationTime;
-
-    @OneToMany(mappedBy = "booking", cascade = CascadeType.ALL, fetch = FetchType.EAGER, orphanRemoval = true)
-    private List<BookingSeat> bookingSeats = new ArrayList<>();
-
-    @JsonIgnore
-    @OneToMany(mappedBy = "booking", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    private List<Payment> payments = new ArrayList<>();
+    private List<BookingSeat> bookingSeats = new ArrayList<BookingSeat>();
+    private List<Payment> payments = new ArrayList<Payment>();
 
     public Booking() {
+        super();
     }
 
-    public Booking(String bookingReference, User user, Show show, Double totalAmount, BookingStatus bookingStatus) {
+    public Booking(String bookingReference, User user, Show show, Double totalAmount, String bookingStatus) {
+        super();
         this.bookingReference = bookingReference;
         this.user = user;
         this.show = show;
         this.totalAmount = totalAmount;
-        this.bookingStatus = bookingStatus;
+        this.bookingStatus = (bookingStatus != null) ? bookingStatus : BookingStatus.PENDING_PAYMENT;
         this.bookingTime = LocalDateTime.now();
+    }
+
+    @Override
+    public String getEntitySummary() {
+        return "Booking[id=" + getId() + ", ref=" + bookingReference + ", status=" + bookingStatus + "]";
     }
 
     public String getBookingReference() {
@@ -93,11 +72,11 @@ public class Booking extends BaseEntity {
         this.totalAmount = totalAmount;
     }
 
-    public BookingStatus getBookingStatus() {
+    public String getBookingStatus() {
         return bookingStatus;
     }
 
-    public void setBookingStatus(BookingStatus bookingStatus) {
+    public void setBookingStatus(String bookingStatus) {
         this.bookingStatus = bookingStatus;
     }
 

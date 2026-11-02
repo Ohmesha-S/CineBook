@@ -1,21 +1,20 @@
 package com.movieticket.dto;
 
-import com.movieticket.enums.SeatCategory;
 import com.movieticket.model.Seat;
 
 public class SeatDto {
     private Long id;
     private String rowLabel;
     private Integer seatNumber;
-    private SeatCategory seatCategory;
+    private String seatCategory;
     private Double price;
-    private String status; // AVAILABLE, BOOKED, HELD
+    private String status;
     private boolean active;
 
     public SeatDto() {
     }
 
-    public SeatDto(Long id, String rowLabel, Integer seatNumber, SeatCategory seatCategory, Double price, String status, boolean active) {
+    public SeatDto(Long id, String rowLabel, Integer seatNumber, String seatCategory, Double price, String status, boolean active) {
         this.id = id;
         this.rowLabel = rowLabel;
         this.seatNumber = seatNumber;
@@ -26,7 +25,9 @@ public class SeatDto {
     }
 
     public static SeatDto fromEntity(Seat seat, Double effectivePrice, String status) {
-        if (seat == null) return null;
+        if (seat == null) {
+            return null;
+        }
         return new SeatDto(
                 seat.getId(),
                 seat.getRowLabel(),
@@ -62,11 +63,11 @@ public class SeatDto {
         this.seatNumber = seatNumber;
     }
 
-    public SeatCategory getSeatCategory() {
+    public String getSeatCategory() {
         return seatCategory;
     }
 
-    public void setSeatCategory(SeatCategory seatCategory) {
+    public void setSeatCategory(String seatCategory) {
         this.seatCategory = seatCategory;
     }
 

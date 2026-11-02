@@ -1,57 +1,32 @@
 package com.movieticket.model;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.movieticket.enums.ShowStatus;
-import jakarta.persistence.*;
-import jakarta.validation.constraints.NotNull;
+
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
 
-@Entity
-@Table(name = "shows", indexes = {
-    @Index(name = "idx_show_movie", columnList = "movie_id"),
-    @Index(name = "idx_show_screen", columnList = "screen_id"),
-    @Index(name = "idx_show_date", columnList = "show_date")
-})
-public class Show extends BaseEntity {
+/**
+ * Unit 1 & Unit 2: Inheritance (extends BaseEntity) and Comparable<Show> for chronological sorting.
+ */
+public class Show extends BaseEntity implements Comparable<Show> {
 
-    @ManyToOne(fetch = FetchType.EAGER)
-    @JoinColumn(name = "movie_id", nullable = false)
     private Movie movie;
-
-    @ManyToOne(fetch = FetchType.EAGER)
-    @JoinColumn(name = "screen_id", nullable = false)
     private Screen screen;
-
-    @NotNull(message = "Show date is required")
-    @Column(name = "show_date", nullable = false)
     private LocalDate showDate;
-
-    @NotNull(message = "Start time is required")
-    @Column(name = "start_time", nullable = false)
     private LocalTime startTime;
-
-    @NotNull(message = "End time is required")
-    @Column(name = "end_time", nullable = false)
     private LocalTime endTime;
-
-    @Enumerated(EnumType.STRING)
-    @Column(name = "status", nullable = false, length = 30)
-    private ShowStatus status = ShowStatus.SCHEDULED;
-
-    @Column(name = "price_multiplier")
+    private String status = ShowStatus.SCHEDULED;
     private Double priceMultiplier = 1.0;
-
-    @JsonIgnore
-    @OneToMany(mappedBy = "show", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    private List<Booking> bookings = new ArrayList<>();
+    private List<Booking> bookings = new ArrayList<Booking>();
 
     public Show() {
+        super();
     }
 
-    public Show(Movie movie, Screen screen, LocalDate showDate, LocalTime startTime, LocalTime endTime, ShowStatus status) {
+    public Show(Movie movie, Screen screen, LocalDate showDate, LocalTime startTime, LocalTime endTime, String status) {
+        super();
         this.movie = movie;
         this.screen = screen;
         this.showDate = showDate;
@@ -59,6 +34,28 @@ public class Show extends BaseEntity {
         this.endTime = endTime;
         this.status = (status != null) ? status : ShowStatus.SCHEDULED;
         this.priceMultiplier = 1.0;
+    }
+
+    @Override
+    public int compareTo(Show other) {
+        if (other == null) {
+            return -1;
+        }
+        if (this.showDate != null && other.showDate != null) {
+            int dateCmp = this.showDate.compareTo(other.showDate);
+            if (dateCmp != 0) {
+                return dateCmp;
+            }
+        }
+        if (this.startTime != null && other.startTime != null) {
+            return this.startTime.compareTo(other.startTime);
+        }
+        return 0;
+    }
+
+    @Override
+    public String getEntitySummary() {
+        return "Show[id=" + getId() + ", date=" + showDate + ", start=" + startTime + ", status=" + status + "]";
     }
 
     public Movie getMovie() {
@@ -101,11 +98,11 @@ public class Show extends BaseEntity {
         this.endTime = endTime;
     }
 
-    public ShowStatus getStatus() {
+    public String getStatus() {
         return status;
     }
 
-    public void setStatus(ShowStatus status) {
+    public void setStatus(String status) {
         this.status = status;
     }
 

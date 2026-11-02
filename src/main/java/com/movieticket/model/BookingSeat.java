@@ -1,46 +1,33 @@
 package com.movieticket.model;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
-import jakarta.persistence.*;
-import jakarta.validation.constraints.NotNull;
-
-@Entity
-@Table(name = "booking_seats", indexes = {
-    @Index(name = "idx_booking_seat_booking", columnList = "booking_id"),
-    @Index(name = "idx_booking_seat_show", columnList = "show_id"),
-    @Index(name = "idx_booking_seat_seat", columnList = "seat_id")
-})
+/**
+ * Unit 1: Java Fundamentals - Inheritance, Constructors, Encapsulation, Method Overriding.
+ */
 public class BookingSeat extends BaseEntity {
 
-    @JsonIgnore
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "booking_id", nullable = false)
     private Booking booking;
-
-    @ManyToOne(fetch = FetchType.EAGER)
-    @JoinColumn(name = "seat_id", nullable = false)
     private Seat seat;
-
-    @ManyToOne(fetch = FetchType.EAGER)
-    @JoinColumn(name = "show_id", nullable = false)
     private Show show;
-
-    @NotNull(message = "Seat price is required")
-    @Column(name = "price", nullable = false)
     private Double price;
-
-    @Column(name = "status", nullable = false, length = 30)
-    private String status = "BOOKED"; // BOOKED, CANCELLED
+    private String status = "BOOKED";
 
     public BookingSeat() {
+        super();
     }
 
     public BookingSeat(Booking booking, Seat seat, Show show, Double price, String status) {
+        super();
         this.booking = booking;
         this.seat = seat;
         this.show = show;
         this.price = price;
         this.status = (status != null) ? status : "BOOKED";
+    }
+
+    @Override
+    public String getEntitySummary() {
+        String seatLabel = (seat != null) ? seat.getSeatIdentifier() : "N/A";
+        return "BookingSeat[id=" + getId() + ", seat=" + seatLabel + ", status=" + status + "]";
     }
 
     public Booking getBooking() {

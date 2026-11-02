@@ -1,16 +1,9 @@
 package com.movieticket.dto;
 
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
-
 public class ScreenRequest {
 
-    @NotNull(message = "Theatre ID is required")
     private Long theatreId;
-
-    @NotBlank(message = "Screen name is required")
     private String screenName;
-
     private Integer totalRows = 5;
     private Integer seatsPerRow = 10;
     private String screenType = "Dolby Atmos 4K";

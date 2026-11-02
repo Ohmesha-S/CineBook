@@ -1,35 +1,44 @@
 package com.movieticket.model;
 
-import jakarta.persistence.*;
 import java.time.LocalDateTime;
 
 /**
- * BaseEntity demonstrates OOP Inheritance by centralizing common persistence attributes
- * (id, createdAt, updatedAt) and lifecycle event hooks for all domain entities.
+ * Unit 1: Java Fundamentals - Abstract Class, Inheritance, Protected Members,
+ * Overloaded Constructors, Method Overriding, and Dynamic Method Dispatch.
  */
-@MappedSuperclass
 public abstract class BaseEntity {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-
-    @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
-
-    @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
-    @PrePersist
-    protected void onCreate() {
-        this.createdAt = LocalDateTime.now();
+    protected BaseEntity() {
+        LocalDateTime now = LocalDateTime.now();
+        this.createdAt = now;
+        this.updatedAt = now;
+    }
+
+    protected BaseEntity(Long id) {
+        this();
+        this.id = id;
+    }
+
+    public void touchForCreate() {
+        LocalDateTime now = LocalDateTime.now();
+        if (this.createdAt == null) {
+            this.createdAt = now;
+        }
+        this.updatedAt = now;
+    }
+
+    public void touchForUpdate() {
         this.updatedAt = LocalDateTime.now();
     }
 
-    @PreUpdate
-    protected void onUpdate() {
-        this.updatedAt = LocalDateTime.now();
-    }
+    /**
+     * Abstract method implemented by all subclasses to demonstrate Dynamic Method Dispatch.
+     */
+    public abstract String getEntitySummary();
 
     public Long getId() {
         return id;
@@ -53,5 +62,10 @@ public abstract class BaseEntity {
 
     public void setUpdatedAt(LocalDateTime updatedAt) {
         this.updatedAt = updatedAt;
+    }
+
+    @Override
+    public String toString() {
+        return getEntitySummary();
     }
 }

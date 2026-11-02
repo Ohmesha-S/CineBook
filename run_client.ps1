@@ -1,2 +1,2 @@
-Write-Host "Starting CineLuxe Java Console Client (TCP Socket)..." -ForegroundColor Cyan
-& ".\mvnw.cmd" compile exec:java "-Dexec.mainClass=com.movieticket.client.CinemaClient"
+Write-Host "Starting CineBook Java Console Client (TCP Socket on Port 8888)..." -ForegroundColor Cyan
+java -cp "target/classes" com.movieticket.client.CinemaClient @args

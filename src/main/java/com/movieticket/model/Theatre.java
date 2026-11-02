@@ -1,48 +1,37 @@
 package com.movieticket.model;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
-import jakarta.persistence.*;
-import jakarta.validation.constraints.NotBlank;
 import java.util.ArrayList;
 import java.util.List;
 
-@Entity
-@Table(name = "theatres", indexes = {
-    @Index(name = "idx_theatre_name", columnList = "name"),
-    @Index(name = "idx_theatre_location", columnList = "location")
-})
+/**
+ * Unit 1: Java Fundamentals - Inheritance, Constructors, Encapsulation, Method Overriding.
+ */
 public class Theatre extends BaseEntity {
 
-    @NotBlank(message = "Theatre name is required")
-    @Column(name = "name", nullable = false, length = 120)
     private String name;
-
-    @NotBlank(message = "Location/City is required")
-    @Column(name = "location", nullable = false, length = 100)
     private String location;
-
-    @Column(name = "address", length = 255)
     private String address;
-
-    @Column(name = "contact_number", length = 30)
     private String contactNumber;
-
-    @Column(name = "status", nullable = false, length = 20)
     private String status = "ACTIVE";
-
-    @JsonIgnore
-    @OneToMany(mappedBy = "theatre", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    private List<Screen> screens = new ArrayList<>();
+    private int screenCount = 0;
+    private List<Screen> screens = new ArrayList<Screen>();
 
     public Theatre() {
+        super();
     }
 
     public Theatre(String name, String location, String address, String contactNumber, String status) {
+        super();
         this.name = name;
         this.location = location;
         this.address = address;
         this.contactNumber = contactNumber;
         this.status = (status != null) ? status : "ACTIVE";
+    }
+
+    @Override
+    public String getEntitySummary() {
+        return "Theatre[id=" + getId() + ", name=" + name + ", location=" + location + "]";
     }
 
     public String getName() {
@@ -83,6 +72,17 @@ public class Theatre extends BaseEntity {
 
     public void setStatus(String status) {
         this.status = status;
+    }
+
+    public int getScreenCount() {
+        if (screens != null && !screens.isEmpty()) {
+            return screens.size();
+        }
+        return screenCount;
+    }
+
+    public void setScreenCount(int screenCount) {
+        this.screenCount = screenCount;
     }
 
     public List<Screen> getScreens() {

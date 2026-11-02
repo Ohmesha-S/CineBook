@@ -1,17 +1,16 @@
 package com.movieticket.dto;
 
-import com.movieticket.enums.PaymentMethod;
-import com.movieticket.enums.PaymentStatus;
 import com.movieticket.model.Payment;
+
 import java.time.LocalDateTime;
 
 public class PaymentResponse {
     private Long id;
     private String paymentReference;
     private String bookingReference;
-    private PaymentMethod paymentMethod;
+    private String paymentMethod;
     private Double amount;
-    private PaymentStatus paymentStatus;
+    private String paymentStatus;
     private LocalDateTime transactionTime;
     private String message;
 
@@ -19,7 +18,9 @@ public class PaymentResponse {
     }
 
     public static PaymentResponse fromEntity(Payment payment, String bookingReference, String message) {
-        if (payment == null) return null;
+        if (payment == null) {
+            return null;
+        }
         PaymentResponse dto = new PaymentResponse();
         dto.setId(payment.getId());
         dto.setPaymentReference(payment.getPaymentReference());
@@ -56,11 +57,11 @@ public class PaymentResponse {
         this.bookingReference = bookingReference;
     }
 
-    public PaymentMethod getPaymentMethod() {
+    public String getPaymentMethod() {
         return paymentMethod;
     }
 
-    public void setPaymentMethod(PaymentMethod paymentMethod) {
+    public void setPaymentMethod(String paymentMethod) {
         this.paymentMethod = paymentMethod;
     }
 
@@ -72,11 +73,11 @@ public class PaymentResponse {
         this.amount = amount;
     }
 
-    public PaymentStatus getPaymentStatus() {
+    public String getPaymentStatus() {
         return paymentStatus;
     }
 
-    public void setPaymentStatus(PaymentStatus paymentStatus) {
+    public void setPaymentStatus(String paymentStatus) {
         this.paymentStatus = paymentStatus;
     }
 

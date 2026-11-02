@@ -1,52 +1,36 @@
 package com.movieticket.model;
 
-import jakarta.persistence.*;
 import java.time.LocalDateTime;
 
-@Entity
-@Table(name = "show_seat_reservations",
-    uniqueConstraints = {
-        @UniqueConstraint(name = "uk_show_seat_reservation", columnNames = {"show_id", "seat_id"})
-    },
-    indexes = {
-        @Index(name = "idx_reservation_show", columnList = "show_id"),
-        @Index(name = "idx_reservation_seat", columnList = "seat_id"),
-        @Index(name = "idx_reservation_expiry", columnList = "expires_at")
-    }
-)
+/**
+ * Unit 1: Java Fundamentals - Inheritance, Constructors, Encapsulation, Method Overriding.
+ */
 public class ShowSeatReservation extends BaseEntity {
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "show_id", nullable = false)
     private Show show;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "seat_id", nullable = false)
     private Seat seat;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id", nullable = false)
     private User user;
-
-    @Column(name = "booking_reference", length = 50)
     private String bookingReference;
-
-    @Column(name = "status", nullable = false, length = 30)
-    private String status = "HELD"; // HELD, CONFIRMED
-
-    @Column(name = "expires_at", nullable = false)
+    private String status = "HELD";
     private LocalDateTime expiresAt;
 
     public ShowSeatReservation() {
+        super();
     }
 
     public ShowSeatReservation(Show show, Seat seat, User user, String bookingReference, String status, LocalDateTime expiresAt) {
+        super();
         this.show = show;
         this.seat = seat;
         this.user = user;
         this.bookingReference = bookingReference;
-        this.status = status;
+        this.status = (status != null) ? status : "HELD";
         this.expiresAt = expiresAt;
+    }
+
+    @Override
+    public String getEntitySummary() {
+        return "ShowSeatReservation[id=" + getId() + ", ref=" + bookingReference + ", status=" + status + "]";
     }
 
     public Show getShow() {
@@ -98,6 +82,6 @@ public class ShowSeatReservation extends BaseEntity {
     }
 
     public boolean isExpired() {
-        return LocalDateTime.now().isAfter(this.expiresAt);
+        return this.expiresAt != null && LocalDateTime.now().isAfter(this.expiresAt);
     }
 }

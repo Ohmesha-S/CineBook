@@ -10,7 +10,7 @@ public class PasswordEncoderTest {
     private final PasswordEncoder encoder = new PasswordEncoder();
 
     @Test
-    @DisplayName("Should encode password and verify match with salted SHA-256")
+    @DisplayName("Should encode password and verify match with salted polynomial hash")
     void testEncodeAndMatch() {
         String raw = "SecurePass@123";
         String encoded = encoder.encode(raw);
