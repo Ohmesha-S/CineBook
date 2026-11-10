@@ -1,203 +1,385 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>CineBook - Premium Movie Ticket Booking Experience</title>
-  <meta name="description" content="Book tickets for the latest movies in IMAX, 4DX, and Dolby Atmos. Live seat layouts, instant confirmation, and seamless booking.">
-  
-  <!-- Fonts & Icons -->
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-  
-  <!-- Application Stylesheets -->
-  <link rel="stylesheet" href="/css/style.css">
-  <link rel="stylesheet" href="/css/movies.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simple Movie Ticket Booking System</title>
+    <style>
+        * { box-sizing: border-box; font-family: Arial, sans-serif; }
+        body { background-color: #f4f6f9; margin: 0; padding: 20px; color: #333; }
+        .container { max-width: 900px; margin: 0 auto; background: white; padding: 25px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        h1 { text-align: center; color: #2c3e50; margin-bottom: 5px; }
+        p.subtitle { text-align: center; color: #7f8c8d; margin-top: 0; margin-bottom: 25px; }
+        
+        .step-box { border: 1px solid #dfe6e9; border-radius: 6px; padding: 15px; margin-bottom: 20px; }
+        .step-title { font-size: 16px; font-weight: bold; color: #2980b9; margin-bottom: 12px; }
+        
+        label { display: block; margin-bottom: 6px; font-weight: bold; font-size: 14px; }
+        select, input { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; margin-bottom: 15px; font-size: 14px; }
+        
+        .screen-display { background: #34495e; color: white; text-align: center; padding: 8px; border-radius: 4px; margin: 15px 0 20px 0; font-size: 13px; letter-spacing: 2px; }
+        .seat-grid { display: grid; grid-template-columns: repeat(10, 1fr); gap: 8px; margin-bottom: 15px; }
+        .seat {
+            padding: 10px 0; text-align: center; background: #e1f5fe; border: 1px solid #0288d1;
+            border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: bold; user-select: none;
+        }
+        .seat.selected { background: #4caf50; color: white; border-color: #2e7d32; }
+        .seat.booked { background: #e0e0e0; color: #9e9e9e; border-color: #bdbdbd; cursor: not-allowed; }
+        
+        .legend { display: flex; justify-content: center; gap: 20px; font-size: 13px; margin-bottom: 10px; }
+        .legend-item { display: flex; align-items: center; gap: 6px; }
+        .legend-box { width: 16px; height: 16px; border-radius: 3px; }
+        
+        .btn { background: #27ae60; color: white; border: none; padding: 12px 20px; border-radius: 4px; font-size: 16px; cursor: pointer; width: 100%; font-weight: bold; }
+        .btn:hover { background: #219653; }
+        .btn:disabled { background: #bdc3c7; cursor: not-allowed; }
+
+        .receipt-card { background: #fdfefe; border: 2px dashed #27ae60; padding: 20px; border-radius: 6px; margin-top: 20px; display: none; }
+        .receipt-header { font-size: 18px; font-weight: bold; color: #27ae60; text-align: center; margin-bottom: 15px; }
+        .receipt-row { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 14px; }
+        .receipt-row.total { font-weight: bold; font-size: 16px; border-top: 1px solid #eee; padding-top: 8px; }
+        
+        .system-info { margin-top: 30px; font-size: 12px; color: #7f8c8d; text-align: center; border-top: 1px solid #eee; padding-top: 15px; }
+    </style>
 </head>
 <body>
 
-  <!-- Navigation Bar -->
-  <header class="navbar">
-    <div class="container navbar-inner">
-      <a href="/index.html" class="nav-brand">
-        <div class="brand-icon"><i class="fas fa-film"></i></div>
-        <span>Cine<span class="highlight">Book</span></span>
-      </a>
+<div class="container">
+    <h1>🎬 CineBook - Movie Ticket Booking</h1>
+    <p class="subtitle">Java Lab Project (Spring Boot + Pure JDBC + Sockets + Concurrency)</p>
 
-      <ul class="nav-links" id="navLinks">
-        <li><a href="/index.html" class="nav-link active"><i class="fas fa-home"></i> Home</a></li>
-        <li><a href="/movies.html" class="nav-link"><i class="fas fa-play"></i> Movies</a></li>
-        <li><a href="/my-bookings.html" class="nav-link"><i class="fas fa-ticket-alt"></i> My Bookings</a></li>
-      </ul>
+    <!-- STEP 1: SELECT MOVIE & SHOW -->
+    <div class="step-box">
+        <div class="step-title">Step 1: Select Movie & Showtime</div>
+        <label for="movieSelect">Choose Movie:</label>
+        <select id="movieSelect" onchange="onMovieChanged()">
+            <option value="">-- Select a Movie --</option>
+        </select>
 
-      <div class="nav-actions" id="navActions">
-        <!-- Injected dynamically by api.js based on auth state -->
-      </div>
+        <label for="showSelect">Choose Showtime:</label>
+        <select id="showSelect" onchange="loadSeatLayout()" disabled>
+            <option value="">-- Choose movie first --</option>
+        </select>
     </div>
-  </header>
 
-  <!-- Main Content Container -->
-  <main class="container">
-
-    <!-- Hero Featured Premiere Banner -->
-    <section class="hero-banner" id="heroBanner">
-      <div class="hero-overlay"></div>
-      <div class="hero-content">
-        <span class="badge badge-primary"><i class="fas fa-spinner fa-spin"></i> Loading Featured Movie...</span>
-        <h1 class="hero-title" style="margin-top: 1rem;">Experience Cinema Like Never Before</h1>
-        <p class="hero-desc">Discover the biggest blockbusters, book your preferred luxury seats in real time, and enjoy an immersive theatre experience.</p>
-        <div class="hero-actions">
-          <a href="/movies.html" class="btn btn-primary btn-lg"><i class="fas fa-film"></i> Explore Movies</a>
-        </div>
-      </div>
-    </section>
-
-    <!-- Quick Search & Genre Filter Bar -->
-    <section class="filter-bar">
-      <div class="filter-top">
-        <div class="search-box">
-          <i class="fas fa-search"></i>
-          <input type="text" id="movieSearchInput" placeholder="Search by title, genre, director, or language...">
-        </div>
-        <div style="font-size: 0.88rem; color: var(--text-muted);">
-          <i class="fas fa-bolt text-gradient"></i> Instant Live Search
-        </div>
-      </div>
-      <div class="filter-pills" id="genrePills">
-        <button class="pill-btn active" onclick="filterByGenre('ALL', this)">All Genres</button>
-      </div>
-    </section>
-
-    <!-- Now Showing Section -->
-    <section style="margin-bottom: 3.5rem;">
-      <div class="section-header">
-        <div>
-          <h2><i class="fas fa-play-circle text-gradient"></i> Now Showing in Theatres</h2>
-          <p style="color: var(--text-muted); font-size: 0.9rem; margin-top: 0.2rem;">Select a movie to pick your cinema hall and reserve seats</p>
-        </div>
-        <a href="/movies.html">See All <i class="fas fa-arrow-right"></i></a>
-      </div>
-
-      <div class="movies-grid" id="nowShowingGrid">
-        <!-- Dynamically rendered by home.js -->
-      </div>
-    </section>
-
-    <!-- Why CineBook Feature Section -->
-    <section style="background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); padding: 3rem 2rem; margin-bottom: 3.5rem;">
-      <div style="text-align: center; max-width: 600px; margin: 0 auto 2.5rem;">
-        <span class="badge badge-cyan"><i class="fas fa-star"></i> Cutting-Edge Platform</span>
-        <h2 style="font-size: 2rem; margin-top: 0.5rem;">Why Book With CineBook?</h2>
-        <p style="color: var(--text-secondary); margin-top: 0.5rem;">Engineered for high performance, dynamic concurrency protection, and an unforgettable movie night.</p>
-      </div>
-
-      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 2rem;">
-        <div style="background: var(--bg-elevated); padding: 1.75rem; border-radius: var(--radius-md); border: 1px solid var(--border-subtle); text-align: center;">
-          <div style="width: 50px; height: 50px; border-radius: 50%; background: rgba(229, 9, 20, 0.15); color: #ff4b59; display: flex; align-items: center; justify-content: center; font-size: 1.4rem; margin: 0 auto 1.25rem;">
-            <i class="fas fa-chair"></i>
-          </div>
-          <h3 style="font-size: 1.15rem; margin-bottom: 0.5rem;">Live Seat Map</h3>
-          <p style="color: var(--text-muted); font-size: 0.88rem;">Interactive seat selection with real-time locking prevents double booking instantly.</p>
+    <!-- STEP 2: SELECT SEATS -->
+    <div class="step-box" id="seatSelectionBox" style="display: none;">
+        <div class="step-title">Step 2: Choose Your Seats</div>
+        <div class="screen-display">SCREEN THIS WAY</div>
+        
+        <div class="legend">
+            <div class="legend-item"><div class="legend-box" style="background:#e1f5fe; border:1px solid #0288d1;"></div> Available</div>
+            <div class="legend-item"><div class="legend-box" style="background:#4caf50;"></div> Selected</div>
+            <div class="legend-item"><div class="legend-box" style="background:#e0e0e0; border:1px solid #bdbdbd;"></div> Already Booked</div>
         </div>
 
-        <div style="background: var(--bg-elevated); padding: 1.75rem; border-radius: var(--radius-md); border: 1px solid var(--border-subtle); text-align: center;">
-          <div style="width: 50px; height: 50px; border-radius: 50%; background: rgba(0, 229, 255, 0.15); color: #00e5ff; display: flex; align-items: center; justify-content: center; font-size: 1.4rem; margin: 0 auto 1.25rem;">
-            <i class="fas fa-credit-card"></i>
-          </div>
-          <h3 style="font-size: 1.15rem; margin-bottom: 0.5rem;">Simulated Checkout</h3>
-          <p style="color: var(--text-muted); font-size: 0.88rem;">Multi-channel payment simulation supporting Card, UPI, and Net Banking tests.</p>
+        <div id="seatGrid" class="seat-grid"></div>
+
+        <div style="font-size: 14px; margin-top: 10px;">
+            <strong>Selected Seats:</strong> <span id="selectedSeatsText">None</span><br>
+            <strong>Total Amount:</strong> ₹<span id="totalAmountText">0</span>
         </div>
-
-        <div style="background: var(--bg-elevated); padding: 1.75rem; border-radius: var(--radius-md); border: 1px solid var(--border-subtle); text-align: center;">
-          <div style="width: 50px; height: 50px; border-radius: 50%; background: rgba(245, 158, 11, 0.15); color: #fbbf24; display: flex; align-items: center; justify-content: center; font-size: 1.4rem; margin: 0 auto 1.25rem;">
-            <i class="fas fa-qrcode"></i>
-          </div>
-          <h3 style="font-size: 1.15rem; margin-bottom: 0.5rem;">Digital E-Tickets</h3>
-          <p style="color: var(--text-muted); font-size: 0.88rem;">Instant boarding pass generation with unique verification codes and print support.</p>
-        </div>
-
-        <div style="background: var(--bg-elevated); padding: 1.75rem; border-radius: var(--radius-md); border: 1px solid var(--border-subtle); text-align: center;">
-          <div style="width: 50px; height: 50px; border-radius: 50%; background: rgba(16, 185, 129, 0.15); color: #34d399; display: flex; align-items: center; justify-content: center; font-size: 1.4rem; margin: 0 auto 1.25rem;">
-            <i class="fas fa-shield-alt"></i>
-          </div>
-          <h3 style="font-size: 1.15rem; margin-bottom: 0.5rem;">Reliable Security</h3>
-          <p style="color: var(--text-muted); font-size: 0.88rem;">Spring Security 6 with stateless JWT authentication and role-based access control.</p>
-        </div>
-      </div>
-    </section>
-
-    <!-- Upcoming Movies Section -->
-    <section style="margin-bottom: 4rem;">
-      <div class="section-header">
-        <div>
-          <h2><i class="fas fa-calendar-alt text-gradient"></i> Coming Soon to CineBook</h2>
-          <p style="color: var(--text-muted); font-size: 0.9rem; margin-top: 0.2rem;">Preview upcoming cinematic releases arriving shortly</p>
-        </div>
-        <a href="/movies.html">Full Catalog <i class="fas fa-arrow-right"></i></a>
-      </div>
-
-      <div class="movies-grid" id="upcomingGrid">
-        <!-- Dynamically rendered by home.js -->
-      </div>
-    </section>
-
-  </main>
-
-  <!-- Global Footer -->
-  <footer class="footer">
-    <div class="container">
-      <div class="footer-grid">
-        <div class="footer-brand">
-          <div class="nav-brand">
-            <div class="brand-icon"><i class="fas fa-film"></i></div>
-            <span>Cine<span class="highlight">Book</span></span>
-          </div>
-          <p>A full-stack Java Spring Boot and MySQL academic software engineering project demonstrating 3-tier architecture, OOP, and concurrent booking control.</p>
-        </div>
-
-        <div class="footer-col">
-          <h4>Explore</h4>
-          <ul class="footer-links">
-            <li><a href="/index.html">Home</a></li>
-            <li><a href="/movies.html">All Movies</a></li>
-            <li><a href="/my-bookings.html">My Bookings</a></li>
-            <li><a href="/login.html">Sign In</a></li>
-          </ul>
-        </div>
-
-        <div class="footer-col">
-          <h4>Admin Portal</h4>
-          <ul class="footer-links">
-            <li><a href="/admin.html">Admin Dashboard</a></li>
-            <li><a href="/login.html">Admin Login</a></li>
-            <li><a href="javascript:void(0)" onclick="fillAdminCredentials()">Demo Credentials</a></li>
-          </ul>
-        </div>
-
-        <div class="footer-col">
-          <h4>Technologies</h4>
-          <ul class="footer-links">
-            <li><a href="#">Java 21 / Spring Boot 3</a></li>
-            <li><a href="#">MySQL 8 Relational DB</a></li>
-            <li><a href="#">Spring Security & JWT</a></li>
-            <li><a href="#">RESTful Architecture</a></li>
-          </ul>
-        </div>
-      </div>
-
-      <div class="footer-bottom">
-        <div>&copy; 2026 CineBook System. Built for Java Programming Lab Evaluation.</div>
-        <div style="display: flex; gap: 1rem;">
-          <span>Academic Project Demonstration</span>
-        </div>
-      </div>
     </div>
-  </footer>
 
-  <!-- Scripts -->
-  <script src="/js/api.js"></script>
-  <script src="/js/home.js"></script>
+    <!-- STEP 3: CUSTOMER DETAILS & CONFIRMATION -->
+    <div class="step-box" id="customerBox" style="display: none;">
+        <div class="step-title">Step 3: Customer Details & Booking</div>
+        
+        <label for="custName">Your Name:</label>
+        <input type="text" id="custName" value="Rahul Sharma" placeholder="Enter full name">
+
+        <label for="custEmail">Email Address:</label>
+        <input type="email" id="custEmail" value="customer@cinebook.com" placeholder="Enter email">
+
+        <label for="payMethod">Payment Method (Simulated):</label>
+        <select id="payMethod">
+            <option value="CARD">Debit / Credit Card</option>
+            <option value="UPI">UPI Payment</option>
+            <option value="NET_BANKING">Net Banking</option>
+        </select>
+
+        <button class="btn" id="bookBtn" onclick="submitBooking()" disabled>Confirm & Book Ticket</button>
+    </div>
+
+    <!-- RECEIPT -->
+    <div id="receiptBox" class="receipt-card">
+        <div class="receipt-header">✓ TICKET BOOKING CONFIRMED!</div>
+        <div class="receipt-row"><span>Booking Reference:</span> <strong id="recRef"></strong></div>
+        <div class="receipt-row"><span>Movie:</span> <span id="recMovie"></span></div>
+        <div class="receipt-row"><span>Theatre / Screen:</span> <span id="recTheatre"></span></div>
+        <div class="receipt-row"><span>Show Date & Time:</span> <span id="recTime"></span></div>
+        <div class="receipt-row"><span>Seats Booked:</span> <strong id="recSeats"></strong></div>
+        <div class="receipt-row"><span>Customer:</span> <span id="recCustomer"></span></div>
+        <div class="receipt-row total"><span>Total Paid:</span> ₹<span id="recTotal"></span></div>
+        <div style="text-align: center; margin-top: 15px;">
+            <button onclick="resetForm()" style="background:#34495e; color:white; border:none; padding:8px 16px; border-radius:4px; cursor:pointer;">Book Another Ticket</button>
+        </div>
+    </div>
+
+    <div class="system-info">
+        Java Backend Server: <strong>Spring Boot (Port 8080)</strong> &bull;
+        Database: <strong>MySQL (Pure JDBC)</strong> &bull;
+        TCP Socket Server: <strong>Port 8888</strong> &bull;
+        Status Diagnostics: <a href="/status" target="_blank">/status</a>
+    </div>
+</div>
+
+<script>
+    let allMovies = [];
+    let selectedSeats = [];
+    let seatMap = {};
+    let authToken = null;
+
+    document.addEventListener('DOMContentLoaded', async () => {
+        await initCustomerSession();
+        await loadMovies();
+    });
+
+    async function initCustomerSession() {
+        try {
+            // Auto login as default customer for smooth seamless single-page student demo
+            const res = await fetch('/api/auth/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: 'customer@cinebook.com', password: 'Customer@123' })
+            });
+            const data = await res.json();
+            if (data && data.data && data.data.token) {
+                authToken = data.data.token;
+            }
+        } catch (e) {
+            console.log("Session init note: " + e.message);
+        }
+    }
+
+    async function loadMovies() {
+        try {
+            const res = await fetch('/api/movies');
+            const json = await res.json();
+            allMovies = json.data || [];
+            
+            const movieSelect = document.getElementById('movieSelect');
+            movieSelect.innerHTML = '<option value="">-- Select a Movie --</option>';
+            allMovies.forEach(m => {
+                const opt = document.createElement('option');
+                opt.value = m.id;
+                opt.textContent = m.title + " (" + m.genre + " - " + m.language + ")";
+                movieSelect.appendChild(opt);
+            });
+        } catch (err) {
+            alert("Could not connect to backend server: " + err.message);
+        }
+    }
+
+    async function onMovieChanged() {
+        const movieId = document.getElementById('movieSelect').value;
+        const showSelect = document.getElementById('showSelect');
+        document.getElementById('seatSelectionBox').style.display = 'none';
+        document.getElementById('customerBox').style.display = 'none';
+        document.getElementById('receiptBox').style.display = 'none';
+        selectedSeats = [];
+
+        if (!movieId) {
+            showSelect.innerHTML = '<option value="">-- Choose movie first --</option>';
+            showSelect.disabled = true;
+            return;
+        }
+
+        try {
+            const res = await fetch('/api/shows/movie/' + movieId);
+            const json = await res.json();
+            const shows = json.data || [];
+
+            if (shows.length === 0) {
+                showSelect.innerHTML = '<option value="">No shows currently scheduled</option>';
+                showSelect.disabled = true;
+                return;
+            }
+
+            showSelect.innerHTML = '<option value="">-- Select Showtime --</option>';
+            shows.forEach(s => {
+                const opt = document.createElement('option');
+                opt.value = s.id;
+                opt.textContent = s.theatreName + " | " + s.screenName + " | " + s.showDate + " @ " + s.startTime;
+                showSelect.appendChild(opt);
+            });
+            showSelect.disabled = false;
+        } catch (err) {
+            alert("Error loading shows: " + err.message);
+        }
+    }
+
+    async function loadSeatLayout() {
+        const showId = document.getElementById('showSelect').value;
+        const seatBox = document.getElementById('seatSelectionBox');
+        const custBox = document.getElementById('customerBox');
+        const grid = document.getElementById('seatGrid');
+        
+        selectedSeats = [];
+        updateSeatSummary();
+
+        if (!showId) {
+            seatBox.style.display = 'none';
+            custBox.style.display = 'none';
+            return;
+        }
+
+        try {
+            const res = await fetch('/api/shows/' + showId + '/seats');
+            const json = await res.json();
+            const layout = json.data;
+            const seats = layout.seats || [];
+            
+            grid.innerHTML = '';
+            seatMap = {};
+
+            seats.forEach(seat => {
+                seatMap[seat.id] = seat;
+                const div = document.createElement('div');
+                div.className = 'seat ' + (seat.status === 'AVAILABLE' ? '' : 'booked');
+                div.textContent = seat.rowLabel + seat.seatNumber;
+                div.title = seat.seatCategory + " - Rs. " + seat.price;
+                
+                if (seat.status === 'AVAILABLE') {
+                    div.onclick = () => toggleSeat(seat.id, div);
+                }
+                grid.appendChild(div);
+            });
+
+            seatBox.style.display = 'block';
+            custBox.style.display = 'block';
+        } catch (err) {
+            alert("Error loading seat layout: " + err.message);
+        }
+    }
+
+    function toggleSeat(seatId, element) {
+        const idx = selectedSeats.indexOf(seatId);
+        if (idx === -1) {
+            selectedSeats.push(seatId);
+            element.classList.add('selected');
+        } else {
+            selectedSeats.splice(idx, 1);
+            element.classList.remove('selected');
+        }
+        updateSeatSummary();
+    }
+
+    function updateSeatSummary() {
+        const textSpan = document.getElementById('selectedSeatsText');
+        const totalSpan = document.getElementById('totalAmountText');
+        const bookBtn = document.getElementById('bookBtn');
+
+        if (selectedSeats.length === 0) {
+            textSpan.textContent = 'None';
+            totalSpan.textContent = '0';
+            bookBtn.disabled = true;
+            return;
+        }
+
+        let total = 0;
+        const names = [];
+        selectedSeats.forEach(id => {
+            const s = seatMap[id];
+            if (s) {
+                names.push(s.rowLabel + s.seatNumber);
+                total += s.price;
+            }
+        });
+
+        // Add 20 convenience fee matching backend logic
+        total += 20;
+
+        textSpan.textContent = names.join(', ');
+        totalSpan.textContent = total;
+        bookBtn.disabled = false;
+    }
+
+    async function submitBooking() {
+        const showId = document.getElementById('showSelect').value;
+        const custName = document.getElementById('custName').value.trim();
+        const custEmail = document.getElementById('custEmail').value.trim();
+        const payMethod = document.getElementById('payMethod').value;
+        const bookBtn = document.getElementById('bookBtn');
+
+        if (!custName || !custEmail) {
+            alert('Please enter your name and email.');
+            return;
+        }
+
+        bookBtn.disabled = true;
+        bookBtn.textContent = 'Processing booking...';
+
+        const headers = { 'Content-Type': 'application/json' };
+        if (authToken) {
+            headers['Authorization'] = 'Bearer ' + authToken;
+        }
+
+        try {
+            // Step 1: Create booking and hold seats
+            const bookRes = await fetch('/api/bookings', {
+                method: 'POST',
+                headers: headers,
+                body: JSON.stringify({
+                    showId: parseInt(showId),
+                    seatIds: selectedSeats
+                })
+            });
+
+            const bookJson = await bookRes.json();
+            if (!bookRes.ok) {
+                throw new Error(bookJson.message || 'Failed to book seats.');
+            }
+
+            const bookingRef = bookJson.data.bookingReference;
+
+            // Step 2: Simulate payment confirmation
+            const payRes = await fetch('/api/payments/process', {
+                method: 'POST',
+                headers: headers,
+                body: JSON.stringify({
+                    bookingReference: bookingRef,
+                    paymentMethod: payMethod,
+                    simulateOutcome: 'SUCCESS'
+                })
+            });
+
+            const payJson = await payRes.json();
+            if (!payRes.ok) {
+                throw new Error(payJson.message || 'Payment simulation failed.');
+            }
+
+            // Step 3: Display Ticket Receipt
+            const b = bookJson.data;
+            document.getElementById('recRef').textContent = b.bookingReference;
+            document.getElementById('recMovie').textContent = b.movieTitle;
+            document.getElementById('recTheatre').textContent = b.theatreName + " (" + b.screenName + ")";
+            document.getElementById('recTime').textContent = b.showDate + " at " + b.startTime;
+            document.getElementById('recSeats').textContent = document.getElementById('selectedSeatsText').textContent;
+            document.getElementById('recCustomer').textContent = custName + " (" + custEmail + ")";
+            document.getElementById('recTotal').textContent = b.totalAmount;
+
+            document.getElementById('seatSelectionBox').style.display = 'none';
+            document.getElementById('customerBox').style.display = 'none';
+            document.getElementById('receiptBox').style.display = 'block';
+
+            window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+        } catch (err) {
+            alert('Booking Error: ' + err.message);
+            bookBtn.disabled = false;
+            bookBtn.textContent = 'Confirm & Book Ticket';
+        }
+    }
+
+    function resetForm() {
+        document.getElementById('receiptBox').style.display = 'none';
+        document.getElementById('movieSelect').value = '';
+        document.getElementById('showSelect').innerHTML = '<option value="">-- Choose movie first --</option>';
+        document.getElementById('showSelect').disabled = true;
+        selectedSeats = [];
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+</script>
+
 </body>
 </html>
